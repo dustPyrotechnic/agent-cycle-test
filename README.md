@@ -28,6 +28,8 @@
 
 默认只接受仓库 `OWNER` 创建的 Issue。如确需允许组织成员或协作者，可创建非敏感 Actions variable `AGENT_TRUSTED_ASSOCIATIONS`，值为逗号分隔的 GitHub author association，例如 `OWNER,MEMBER`。
 
+进入 `Settings -> Actions -> General -> Workflow permissions`，启用 **Allow GitHub Actions to create and approve pull requests**。即使工作流声明了 `pull-requests: write`，未启用该仓库设置时 GitHub 仍会拒绝自动创建 PR。
+
 ## 使用方法
 
 1. 创建 Issue，明确期望结果与验收检查。
