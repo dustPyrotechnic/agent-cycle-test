@@ -1,0 +1,35 @@
+name: Agent task
+description: Request a bounded autonomous coding cycle
+title: "[Agent] "
+labels:
+  - solve-it
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The agent works in bounded rounds and publishes changes through a pull request.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior and the scope of the requested change.
+      placeholder: What should be true when this issue is complete?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance checks
+      description: List commands, tests, or observable checks that prove completion.
+      placeholder: |
+        - Command X passes
+        - Behavior Y is documented
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and context
+      description: Include relevant paths, compatibility limits, and decisions. Do not include credentials.
+    validations:
+      required: false
