@@ -2,7 +2,7 @@
 
 - URL: https://github.com/dustPyrotechnic/agent-cycle-test/issues/1
 - Author association: OWNER
-- Labels: solve-it
+- Labels: solve-it, agent-running
 
 ## Body
 
