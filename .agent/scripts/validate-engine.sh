@@ -14,6 +14,7 @@ for script in .agent/scripts/*.sh; do
   bash -n "$script"
 done
 bash -n install.sh
+bash -n agent-cycle
 
 cmp -s CLAUDE.md AGENTS.md || {
   echo "CLAUDE.md and AGENTS.md must remain byte-for-byte identical" >&2
@@ -44,6 +45,7 @@ required_files=(
   .github/ISSUE_TEMPLATE/memory.md
   templates/memory.md
   install.sh
+  agent-cycle
   .github/workflows/reusable-agent-cycle.yml
   templates/agent-cycle-listener.yml
 )

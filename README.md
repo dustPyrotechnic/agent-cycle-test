@@ -43,6 +43,50 @@
 
 ## 接入目标仓库
 
+### 推荐：安装本机快捷命令
+
+在中央引擎仓库中执行一次：
+
+```bash
+./agent-cycle setup
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+之后进入任意目标项目根目录即可部署。当前中央引擎尚未发布 `v1`
+标签，开发期间使用：
+
+```bash
+cd /path/to/target-repository
+agent-cycle deploy --dev
+```
+
+发布稳定 `v1` 标签后，生产项目直接执行：
+
+```bash
+cd /path/to/target-repository
+agent-cycle deploy
+```
+
+快捷命令默认按私有中央引擎配置 `ENGINE_TOKEN` 映射并提交、推送监听器。
+它只是现有 `install.sh` 的薄封装，其他安装参数可以继续传入：
+
+```bash
+# 不自动提交监听器
+agent-cycle deploy --dev --no-commit
+
+# 使用 MiMo，并允许 OWNER 和 MEMBER 创建任务
+agent-cycle deploy --dev --provider mimo --trusted-associations OWNER,MEMBER
+
+# 更新已安装的本机快捷命令
+./agent-cycle setup --force
+```
+
+如果 `~/.local/bin` 尚未加入 shell 的 `PATH`，请把上述 `export` 写入
+`~/.zshrc`。生产环境应使用稳定 tag 或 commit SHA，不要长期使用
+`--dev`。
+
+### 单次远程安装
+
 当前中央引擎是私有仓库。发布稳定的 `v1` tag 后，在任意目标仓库目录运行以下一条认证命令，即可完成监听器安装、GitHub 仓库设置、`solve-it` 标签、可信作者变量和模型 Secret 检查，并只提交、推送监听器文件：
 
 ```bash

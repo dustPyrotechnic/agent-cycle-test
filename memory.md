@@ -8,6 +8,10 @@ The repository is a central, reusable engine for a safe-by-default, issue-driven
 
 - `.github/workflows/reusable-agent-cycle.yml` is the central engine, invoked via `workflow_call`. Target repositories install `templates/agent-cycle-listener.yml` and call it.
 - Root `install.sh` bootstraps a target repository from its working directory: it installs the listener, configures the required GitHub settings, and can commit and push only the listener file.
+- Root `agent-cycle` is a standalone convenience command. `agent-cycle setup`
+  copies it to a local bin directory; `agent-cycle deploy` downloads or invokes
+  `install.sh` and keeps that installer as the single source of deployment
+  behavior.
 - A reusable workflow runs with the CALLING repository's `github` context and `GITHUB_TOKEN`, so all issue, branch, PR, and dispatch operations act on the target repository, not the engine.
 - The runner performs two checkouts: the target repository at `TARGET_ROOT` (default workspace context) and the central engine at a sibling path. The engine `.agent` is snapshotted to `ENGINE_ROOT` out of the target tree before the model runs.
 - Each round uses a deterministic sequential pipeline: analyst -> implementer ->

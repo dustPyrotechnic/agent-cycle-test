@@ -38,8 +38,9 @@
   credentials.
 - `test-installer.sh`: installs listeners into isolated repositories and verifies
   default rendering, custom engine/provider/private-engine rendering, YAML
-  syntax, authenticated download fallback for private engines, and refusal to
-  overwrite an existing listener without `--force`.
+  syntax, the `agent-cycle` local/installed shortcut paths, authenticated
+  download fallback for private engines, and refusal to overwrite an existing
+  listener without `--force`.
 
 ## Engine and Target Roots
 

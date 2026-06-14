@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENGINE_REPOSITORY="${AGENT_ENGINE_REPOSITORY:-dustPyrotechnic/agent-cycle-test}"
+ENGINE_REF="${AGENT_ENGINE_REF:-v1}"
+
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  cat <<'EOF'
+Manage the Agent Cycle shortcut and deploy it from any target repository.
+
+Usage:
+  agent-cycle setup [--bin-dir DIR] [--force]
+  agent-cycle deploy [shortcut options] [install.sh options]
+  agent-cycle help
+
+Commands:
+  setup     Install this shortcut as ~/.local/bin/agent-cycle.
+  deploy    Deploy Agent Cycle from the current target repository root.
+
+Deploy shortcut options:
+  --dev                         Use the central engine's main branch.
+  --engine-repository OWNER/REPO
+                                Override the central engine repository.
+  --engine-ref REF              Override the engine tag or commit SHA.
+  --public-engine               Do not configure the private-engine token.
+  --no-commit                   Do not commit and push the listener.
+
+All other deploy options are forwarded to install.sh. Production deployments
+default to the private dustPyrotechnic/agent-cycle-test@v1 engine and commit the
+listener. Until v1 is published, use: agent-cycle deploy --dev
+EOF
+}
+
+setup_shortcut() {
+  local bin_dir="${AGENT_CYCLE_BIN_DIR:-${HOME}/.local/bin}"
+  local force=false
+  local source_path=""
+  local destination=""
+
+  while (($#)); do
+    case "$1" in
+      --bin-dir)
+        (($# >= 2)) || fail "--bin-dir requires a value"
+        bin_dir="$2"
+        shift 2
+        ;;
+      --force)
+        force=true
+        shift
+        ;;
+      -h | --help)
+        usage
+        return
+        ;;
+      *)
+        fail "unknown setup option: $1"
+        ;;
+    esac
+  done
+
+  source_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  destination="${bin_dir}/agent-cycle"
+
+  mkdir -p "$bin_dir"
+  if [[ -e "$destination" ]] && ! cmp -s "$source_path" "$destination" && [[ "$force" != true ]]; then
+    fail "${destination} already exists and differs; rerun setup with --force"
+  fi
+
+  if [[ "$source_path" != "$destination" ]]; then
+    install -m 0755 "$source_path" "$destination"
+  fi
+
+  printf 'Installed Agent Cycle shortcut: %s\n' "$destination"
+  case ":${PATH}:" in
+    *":${bin_dir}:"*) ;;
+    *)
+      printf 'Add this directory to PATH before using the command:\n'
+      printf '  export PATH="%s:%s"\n' "$bin_dir" "\$PATH"
+      ;;
+  esac
+}
+
+deploy() {
+  local engine_repository="$ENGINE_REPOSITORY"
+  local engine_ref="$ENGINE_REF"
+  local private_engine=true
+  local commit_listener=true
+  local script_dir=""
+  local installer=""
+  local downloaded_installer=""
+  local -a installer_args=()
+  local -a forwarded_args=()
+
+  while (($#)); do
+    case "$1" in
+      --dev)
+        engine_ref=main
+        shift
+        ;;
+      --engine-repository)
+        (($# >= 2)) || fail "--engine-repository requires a value"
+        engine_repository="$2"
+        shift 2
+        ;;
+      --engine-ref)
+        (($# >= 2)) || fail "--engine-ref requires a value"
+        engine_ref="$2"
+        shift 2
+        ;;
+      --private-engine)
+        private_engine=true
+        shift
+        ;;
+      --public-engine)
+        private_engine=false
+        shift
+        ;;
+      --commit)
+        commit_listener=true
+        shift
+        ;;
+      --no-commit)
+        commit_listener=false
+        shift
+        ;;
+      -h | --help)
+        usage
+        return
+        ;;
+      --)
+        shift
+        forwarded_args+=("$@")
+        break
+        ;;
+      *)
+        forwarded_args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "${script_dir}/install.sh" ]]; then
+    installer="${script_dir}/install.sh"
+  else
+    command -v gh >/dev/null 2>&1 || fail "gh is required to download the central installer"
+    downloaded_installer="$(mktemp)"
+    trap 'rm -f "$downloaded_installer"' EXIT
+    gh api \
+      --method GET \
+      -H "Accept: application/vnd.github.raw+json" \
+      "repos/${engine_repository}/contents/install.sh" \
+      -f "ref=${engine_ref}" >"$downloaded_installer"
+    installer="$downloaded_installer"
+  fi
+
+  installer_args=(
+    --engine-repository "$engine_repository"
+    --engine-ref "$engine_ref"
+  )
+  if [[ "$private_engine" == true ]]; then
+    installer_args+=(--private-engine)
+  fi
+  if [[ "$commit_listener" == true ]]; then
+    installer_args+=(--commit)
+  fi
+
+  bash "$installer" "${installer_args[@]}" "${forwarded_args[@]}"
+  if [[ -n "$downloaded_installer" ]]; then
+    rm -f "$downloaded_installer"
+    trap - EXIT
+  fi
+}
+
+command_name="${1:-help}"
+if (($#)); then
+  shift
+fi
+
+case "$command_name" in
+  setup)
+    setup_shortcut "$@"
+    ;;
+  deploy)
+    deploy "$@"
+    ;;
+  help | -h | --help)
+    usage
+    ;;
+  *)
+    fail "unknown command: ${command_name}; run 'agent-cycle help'"
+    ;;
+esac

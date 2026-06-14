@@ -33,6 +33,17 @@ assert_contains "    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/re
 assert_contains "      engine_repository: dustPyrotechnic/agent-cycle-test" "$default_listener"
 assert_contains "      engine_ref: v1" "$default_listener"
 
+shortcut_target="${test_root}/shortcut"
+make_target "$shortcut_target"
+(
+  cd "$shortcut_target"
+  bash "${repo_root}/agent-cycle" deploy --dev --no-commit --local-only >/dev/null
+)
+shortcut_listener="${shortcut_target}/.github/workflows/agent-cycle.yml"
+assert_contains "    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@main" "$shortcut_listener"
+assert_contains "      engine_ref: main" "$shortcut_listener"
+assert_contains "      engine_token: \${{ secrets.ENGINE_TOKEN }}" "$shortcut_listener"
+
 custom_target="${test_root}/custom"
 make_target "$custom_target"
 (
@@ -81,7 +92,18 @@ exit 22
 EOF
 cat >"${remote_bin}/gh" <<'EOF'
 #!/usr/bin/env bash
-cat "$FAKE_LISTENER_TEMPLATE"
+case "$*" in
+  *repos/*/contents/install.sh*)
+    cat "$FAKE_INSTALLER"
+    ;;
+  *repos/*/contents/templates/agent-cycle-listener.yml*)
+    cat "$FAKE_LISTENER_TEMPLATE"
+    ;;
+  *)
+    echo "Unexpected fake gh invocation: $*" >&2
+    exit 1
+    ;;
+esac
 EOF
 chmod +x "${remote_bin}/curl" "${remote_bin}/gh"
 (
@@ -93,5 +115,25 @@ chmod +x "${remote_bin}/curl" "${remote_bin}/gh"
 remote_listener="${remote_target}/.github/workflows/agent-cycle.yml"
 assert_contains "    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@main" "$remote_listener"
 assert_contains "      engine_ref: main" "$remote_listener"
+
+shortcut_bin="${test_root}/shortcut-bin"
+AGENT_CYCLE_BIN_DIR="$shortcut_bin" bash "${repo_root}/agent-cycle" setup >/dev/null
+[[ -x "${shortcut_bin}/agent-cycle" ]] || {
+  echo "Shortcut setup did not install an executable command" >&2
+  exit 1
+}
+
+remote_shortcut_target="${test_root}/remote-shortcut-target"
+make_target "$remote_shortcut_target"
+(
+  cd "$remote_shortcut_target"
+  PATH="${remote_bin}:$PATH" \
+    FAKE_INSTALLER="${repo_root}/install.sh" \
+    FAKE_LISTENER_TEMPLATE="${repo_root}/templates/agent-cycle-listener.yml" \
+    "${shortcut_bin}/agent-cycle" deploy --dev --no-commit --local-only >/dev/null 2>&1
+)
+remote_shortcut_listener="${remote_shortcut_target}/.github/workflows/agent-cycle.yml"
+assert_contains "    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@main" "$remote_shortcut_listener"
+assert_contains "      engine_token: \${{ secrets.ENGINE_TOKEN }}" "$remote_shortcut_listener"
 
 echo "Installer tests passed"
