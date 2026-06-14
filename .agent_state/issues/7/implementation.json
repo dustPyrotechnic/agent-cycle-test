@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_verification",
+  "summary": "Added --version/-V support to install.sh. Both flags print the version string (1.0.0) and exit 0 with no side effects. All three analyst-specified edits applied: VERSION variable, short-circuit case in argument parser, and usage text entry.",
+  "changes": [
+    "install.sh: Added VERSION=\"1.0.0\" variable after set -euo pipefail",
+    "install.sh: Added --version|-V case as first entry in argument parser with printf exit 0",
+    "install.sh: Added --version, -V usage line before -h/--help in usage()"
+  ],
+  "tests": [
+    "bash install.sh --version: prints '1.0.0' and exits 0",
+    "bash install.sh -V: prints '1.0.0' and exits 0",
+    "find . diff before/after --version run: no files created, modified, or deleted",
+    "shellcheck install.sh .agent/scripts/*.sh: passes with no warnings (exit 0)",
+    "bash .agent/scripts/validate.sh: all tests pass (Specialized pipeline, Installer, Engine config -- exit 0)"
+  ],
+  "deviations": [],
+  "remaining_concerns": [
+    "Version string is hardcoded as 1.0.0; no git tags exist to derive it from. Maintainer may want to adjust this to match the project's versioning scheme."
+  ]
+}

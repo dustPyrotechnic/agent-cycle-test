@@ -3,7 +3,9 @@
   "round": 1,
   "max_rounds": 5,
   "provider": "deepseek",
-  "status": "running",
+  "status": "complete",
   "created_at": "2026-06-14T03:33:04Z",
-  "updated_at": "2026-06-14T03:33:04Z"
+  "updated_at": "2026-06-14T03:36:13Z",
+  "last_summary": "Issue #7 is fully implemented. install.sh now supports --version/-V, printing '1.0.0' and exiting 0 before any side effects. All 6 acceptance checks pass: correct flag behavior, short-circuit, no file modifications, usage text updated, shellcheck clean, validate.sh passing. Only install.sh was modified (7 lines added). No regressions or security issues.",
+  "last_run_url": "https://github.com/dustPyrotechnic/agent-cycle-test/actions/runs/27487209971"
 }

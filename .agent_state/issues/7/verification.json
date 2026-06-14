@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "summary": "All six acceptance checks pass. --version and -V both print '1.0.0' with exit 0, short-circuit before any side effects, no files are touched, usage text shows the new flags, shellcheck reports no warnings, and validate.sh passes all tests. Implementation exactly matches the analyst plan.",
+  "tests": [
+    "bash install.sh --version: prints '1.0.0', exit 0",
+    "bash install.sh -V: prints '1.0.0', exit 0",
+    "bash install.sh --version --engine-repository foo/bar: prints '1.0.0' and exits 0 (short-circuits before processing other args)",
+    "find check before/after --version run: no files created, modified, or deleted",
+    "shellcheck install.sh .agent/scripts/*.sh: passes with no warnings, exit 0",
+    "bash .agent/scripts/validate.sh: all tests pass (Specialized pipeline, Installer, Engine config), exit 0"
+  ],
+  "acceptance_checks": [
+    "bash install.sh --version prints version string and exits 0: pass",
+    "bash install.sh -V behaves same as --version: pass",
+    "--version creates/modifies/deletes no files and performs no gh/git network operations: pass",
+    "usage text includes --version/-V description: pass",
+    "shellcheck install.sh .agent/scripts/*.sh passes: pass",
+    "bash .agent/scripts/validate.sh passes: pass"
+  ],
+  "findings": []
+}

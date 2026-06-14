@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+VERSION="1.0.0"
+
 ENGINE_REPOSITORY="${AGENT_ENGINE_REPOSITORY:-dustPyrotechnic/agent-cycle-test}"
 ENGINE_REF="${AGENT_ENGINE_REF:-v1}"
 TRUSTED_ASSOCIATIONS="${AGENT_TRUSTED_ASSOCIATIONS:-OWNER}"
@@ -30,6 +32,7 @@ Options:
   --force                         Replace an existing listener workflow.
   --local-only                    Install the workflow without changing GitHub settings.
   --skip-secret-check             Do not check or prompt for required Actions secrets.
+  --version, -V                  Print installer version and exit.
   -h, --help                      Show this help.
 
 The listener recognizes every issue; the optional solve-it label only re-runs an
@@ -271,6 +274,10 @@ commit_listener() {
 
 while (($#)); do
   case "$1" in
+    --version | -V)
+      printf '%s\n' "$VERSION"
+      exit 0
+      ;;
     --engine-repository)
       (($# >= 2)) || fail "--engine-repository requires a value"
       ENGINE_REPOSITORY="$2"

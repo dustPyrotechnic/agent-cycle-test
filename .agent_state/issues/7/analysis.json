@@ -1,0 +1,35 @@
+{
+  "status": "ready",
+  "task_type": "feature",
+  "summary": "install.sh currently lacks --version/-V support. Both flags produce \"error: unknown option\" with exit code 1. The feature requires a short-circuit handler in argument parsing that prints a version string and exits 0 without any side effects, plus a usage text update.",
+  "evidence": [
+    "bash install.sh --version → 'error: unknown option: --version' (exit 1)",
+    "bash install.sh -V → 'error: unknown option: -V' (exit 1)",
+    "grep -n 'version\\|VERSION\\|--version\\|-V' install.sh returns no matches for version-related code",
+    "shellcheck install.sh .agent/scripts/*.sh passes with no warnings (baseline clean)",
+    "bash .agent/scripts/validate.sh passes with exit 0 (baseline clean)",
+    "No git tags exist (git tag returns empty); version must be self-contained in install.sh",
+    "usage() function (lines 15-41) documents all options but contains no --version/-V entry"
+  ],
+  "root_cause_or_rationale": "install.sh was developed incrementally without a version-reporting feature. The issue requests it both as a useful installer capability and to validate the agent cycle's ability to pick up untagged issues.",
+  "implementation_plan": [
+    "In install.sh line 2 (after `set -euo pipefail`), add a VERSION variable: `VERSION=\"1.0.0\"`",
+    "In the argument-parsing `while (($#)); do case \"$1\" in` block (line 272), add as the FIRST case entry before `--engine-repository)`:",
+    "  `--version | -V)`",
+    "  `  printf '%s\\n' \"$VERSION\"`",
+    "  `  exit 0`",
+    "  `  ;;`",
+    "In the `usage()` function (around line 22, before the -h/--help line), add:",
+    "  `  --version, -V                  Print installer version and exit.`"
+  ],
+  "validation_plan": [
+    "bash install.sh --version (expect: prints version string, exit 0, no files created/modified/deleted)",
+    "bash install.sh -V (expect: same output and exit code as --version)",
+    "diff <(ls -AR before) <(ls -AR after) after --version run (expect no diff)",
+    "shellcheck install.sh .agent/scripts/*.sh (expect no warnings)",
+    "bash .agent/scripts/validate.sh (expect exit 0 and all tests pass)"
+  ],
+  "risks": [
+    "The issue does not specify an exact version string; the recommended VERSION=\"1.0.0\" may need maintainer adjustment to match the project's versioning scheme."
+  ]
+}
