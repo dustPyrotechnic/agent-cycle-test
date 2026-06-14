@@ -179,4 +179,65 @@ run_fake_round "$credential_root"
 test -f "${credential_root}/engine/credential-leak-detected"
 test "$(jq -r '.status' "${credential_root}/target/.agent_state/issues/1/result.json")" = blocked
 
+fenced_root="$(setup_scenario fenced-output)"
+cat >"${fenced_root}/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+task="$(cat)"
+case "$task" in
+  *"analyst phase"*)
+    printf '%s\n' 'The requested change is not yet present.'
+    printf '%s\n' '```json'
+    printf '%s\n' '{"status":"ready","task_type":"feature","summary":"Change app content.","evidence":["app.txt contains original"],"root_cause_or_rationale":"The requested content is absent.","implementation_plan":["Update app.txt"],"validation_plan":["grep changed app.txt"],"risks":[]}'
+    printf '%s\n' '```'
+    ;;
+  *"implementer phase"*)
+    test -s .agent_state/issues/1/analysis.json
+    printf 'changed\n' >app.txt
+    printf '%s\n' 'Here is the implementation report:'
+    printf '%s\n' '```json'
+    printf '%s\n' '{"status":"ready_for_verification","summary":"Updated app content.","changes":["app.txt: changed content"],"tests":["grep changed app.txt: passed"],"deviations":[],"remaining_concerns":[]}'
+    printf '%s\n' '```'
+    ;;
+  *"verifier phase"*)
+    test -s .agent_state/issues/1/implementation.json
+    grep -q changed app.txt
+    printf '%s\n' '```json'
+    printf '%s\n' '{"status":"pass","summary":"Verified changed content.","tests":["grep changed app.txt: passed"],"acceptance_checks":["app changed: pass - observed changed"],"findings":[]}'
+    printf '%s\n' '```'
+    ;;
+  *"reviewer phase"*)
+    test -s .agent_state/issues/1/verification.json
+    printf '%s\n' 'Final decision below.'
+    printf '%s\n' '```json'
+    printf '%s\n' '{"status":"complete","summary":"Implementation satisfies the issue.","next_step":"Review and merge.","tests":["grep changed app.txt: passed"],"findings":[]}'
+    printf '%s\n' '```'
+    ;;
+  *) exit 7 ;;
+esac
+EOF
+chmod +x "${fenced_root}/bin/claude"
+run_fake_round "$fenced_root"
+test "$(jq -r '.status' "${fenced_root}/target/.agent_state/issues/1/result.json")" = complete
+grep -q changed "${fenced_root}/target/app.txt"
+
+satisfied_root="$(setup_scenario already-satisfied)"
+cat >"${satisfied_root}/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+task="$(cat)"
+case "$task" in
+  *"analyst phase"*)
+    printf '%s\n' '{"status":"satisfied","task_type":"feature","summary":"The requested behavior already exists in app.txt.","evidence":["app.txt already contains the required content"],"root_cause_or_rationale":"A prior change already implemented the requested outcome.","implementation_plan":[],"validation_plan":["grep original app.txt"],"risks":[]}'
+    ;;
+  *) exit 7 ;;
+esac
+EOF
+chmod +x "${satisfied_root}/bin/claude"
+run_fake_round "$satisfied_root"
+test "$(jq -r '.status' "${satisfied_root}/target/.agent_state/issues/1/result.json")" = complete
+test -s "${satisfied_root}/target/.agent_state/issues/1/analysis.json"
+test ! -e "${satisfied_root}/target/.agent_state/issues/1/implementation.json"
+test ! -e "${satisfied_root}/target/.agent_state/issues/1/verification.json"
+test ! -e "${satisfied_root}/target/.agent_state/issues/1/review.json"
+test "$(git -C "${satisfied_root}/target" status --porcelain app.txt)" = ""
+
 echo "Specialized pipeline tests passed"

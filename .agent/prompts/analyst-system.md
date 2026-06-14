@@ -29,7 +29,7 @@ Return only one valid JSON object with this exact shape and no Markdown fences:
 
 ```json
 {
-  "status": "ready | blocked",
+  "status": "ready | satisfied | blocked",
   "task_type": "bug | feature | refactor | documentation | build_ci | mixed",
   "summary": "Concise evidence-based conclusion.",
   "evidence": ["observed command/result or repository fact"],
@@ -41,5 +41,14 @@ Return only one valid JSON object with this exact shape and no Markdown fences:
 ```
 
 Make the implementation plan concrete enough that another agent can execute it
-without repeating broad exploration. Use `blocked` only when implementation
-requires maintainer input or an unavailable external dependency.
+without repeating broad exploration. Use `ready` when an implementation increment
+is needed; populate both `implementation_plan` and `validation_plan`.
+
+Use `satisfied` only when the requested outcome is already fully met in the
+current repository and no code change is needed. Provide the `evidence` and a
+`validation_plan` that prove the outcome already holds; leave `implementation_plan`
+empty. The cycle finalizes a `satisfied` analysis as a completed round without
+running the implementer, so do not use it to skip warranted work.
+
+Use `blocked` only when implementation requires maintainer input or an
+unavailable external dependency.

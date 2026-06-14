@@ -61,6 +61,48 @@ require_command() {
   }
 }
 
+normalize_agent_json() {
+  # Recover a single JSON object from a raw agent transcript in place. Models
+  # sometimes wrap the required JSON in a Markdown code fence or prepend
+  # conversational preamble despite the contract; extract the JSON so the
+  # downstream contract check sees it. Leave the file unchanged when no
+  # parseable JSON can be recovered, so malformed output still fails loudly.
+  local file="$1"
+  local normalized="${file}.normalized"
+
+  if jq -e . "$file" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if awk '
+    /^[[:space:]]*```/ { fence++; next }
+    fence == 1 { print }
+    fence >= 2 { exit }
+  ' "$file" >"$normalized" && [[ -s "$normalized" ]] \
+    && jq -e . "$normalized" >/dev/null 2>&1; then
+    mv "$normalized" "$file"
+    return 0
+  fi
+
+  if awk '
+    { lines[NR] = $0 }
+    END {
+      first = 0
+      last = 0
+      for (i = 1; i <= NR; i++) if (first == 0 && index(lines[i], "{")) first = i
+      for (i = NR; i >= 1; i--) if (last == 0 && index(lines[i], "}")) last = i
+      if (first && last >= first) for (i = first; i <= last; i++) print lines[i]
+    }
+  ' "$file" >"$normalized" && [[ -s "$normalized" ]] \
+    && jq -e . "$normalized" >/dev/null 2>&1; then
+    mv "$normalized" "$file"
+    return 0
+  fi
+
+  rm -f "$normalized"
+  return 0
+}
+
 build_system_prompt() {
   local destination="$1"
   shift
@@ -347,8 +389,9 @@ if [[ "$analyst_status" -ne 0 || ! -s "$ANALYST_OUTPUT" ]]; then
   finish_round
 fi
 
+normalize_agent_json "$ANALYST_OUTPUT"
 if ! jq -e '
-  (.status == "ready" or .status == "blocked")
+  (.status == "ready" or .status == "satisfied" or .status == "blocked")
   and (.task_type == "bug" or .task_type == "feature" or .task_type == "refactor"
     or .task_type == "documentation" or .task_type == "build_ci" or .task_type == "mixed")
   and (.summary | type == "string" and length > 0)
@@ -363,6 +406,7 @@ if ! jq -e '
   and all(.risks[]; type == "string")
   and (.status != "ready" or (.implementation_plan | length) > 0)
   and (.status != "ready" or (.validation_plan | length) > 0)
+  and (.status != "satisfied" or (.validation_plan | length) > 0)
 ' "$ANALYST_OUTPUT" >/dev/null 2>&1; then
   write_runtime_result blocked \
     "The analyst did not produce a result matching the required JSON contract." \
@@ -375,6 +419,26 @@ if [[ "$(jq -r '.status' "$ANALYSIS_FILE")" == "blocked" ]]; then
   write_runtime_result blocked \
     "$(jq -r '.summary' "$ANALYSIS_FILE")" \
     "Resolve the analyst-reported risks or unavailable dependency before retrying."
+  finish_round
+fi
+
+if [[ "$(jq -r '.status' "$ANALYSIS_FILE")" == "satisfied" ]]; then
+  # The analyst evidenced that the requested outcome is already met, so there is
+  # no increment to implement, verify, or review. Finalize the round directly,
+  # recording the analyst's validation plan and evidence so the claim is auditable.
+  jq '{
+    status: "complete",
+    summary: .summary,
+    next_step: "No code change was required; the requested outcome was already satisfied.",
+    tests: .validation_plan,
+    findings: .evidence
+  }' "$ANALYSIS_FILE" >"$RESULT_FILE"
+  {
+    printf '# Handoff\n\n'
+    printf 'Status: complete\n\n'
+    printf '%s\n\n' "$(jq -r '.summary' "$ANALYSIS_FILE")"
+    printf 'Next step: No code change was required; the requested outcome was already satisfied.\n'
+  } >"$HANDOFF_FILE"
   finish_round
 fi
 
@@ -410,6 +474,7 @@ if [[ "$state_before_implementer" != "$state_after_implementer" ]]; then
 fi
 
 if [[ -s "$IMPLEMENTER_OUTPUT" ]]; then
+  normalize_agent_json "$IMPLEMENTER_OUTPUT"
   if ! jq -e '
     (.status == "ready_for_verification" or .status == "blocked")
     and (.summary | type == "string" and length > 0)
@@ -478,6 +543,7 @@ if [[ "$verifier_status" -ne 0 || ! -s "$VERIFIER_OUTPUT" ]]; then
   finish_round
 fi
 
+normalize_agent_json "$VERIFIER_OUTPUT"
 if ! jq -e '
   (.status == "pass" or .status == "fail" or .status == "blocked")
   and (.summary | type == "string" and length > 0)
@@ -534,6 +600,7 @@ if [[ "$reviewer_status" -ne 0 || ! -s "$REVIEWER_OUTPUT" ]]; then
   finish_round
 fi
 
+normalize_agent_json "$REVIEWER_OUTPUT"
 verification_status="$(jq -r '.status' "$VERIFICATION_FILE")"
 if ! jq -e --arg verification_status "$verification_status" '
   (.status == "continue" or .status == "complete" or .status == "blocked")

@@ -8,6 +8,21 @@
   reviewer. It validates and persists each handoff artifact before starting the
   next role.
 - `finalize-round.sh`: validates the result, commits and pushes changes, updates the PR and issue, and optionally dispatches the next round.
+
+### Agent output parsing (`run-round.sh`)
+
+- Each phase output is passed through `normalize_agent_json` before its `jq`
+  contract check. Models may wrap the required JSON in a Markdown code fence or
+  add conversational preamble despite the prompt; the helper recovers the JSON
+  object in place (fenced block first, then widest brace span) and leaves
+  genuinely malformed output untouched so it still fails the contract loudly.
+- The analyst contract accepts a third status, `satisfied`, for when the
+  requested outcome already holds and no increment is needed. The wrapper
+  finalizes a `satisfied` analysis directly as a terminal `complete` result
+  (recording the analyst's `validation_plan` as tests and `evidence` as
+  findings) and skips the implementer, verifier, and reviewer. `satisfied`
+  requires a non-empty `validation_plan`; `ready` still requires a non-empty
+  `implementation_plan` and `validation_plan`.
 - `validate-engine.sh`: validates the central engine repository (shell/YAML syntax, synchronized root instructions, required module memory, reusable workflow, listener template). Runs in CI; blocks engine releases.
 - `validate-target.sh`: validates the target repository after a round. Its
   current generic static check parses workflow YAML. It runs in the privileged
@@ -17,8 +32,9 @@
 - `validate.sh`: backward-compatible shim that execs `validate-engine.sh`.
 - `test-specialized-pipeline.sh`: uses fake Claude and timeout executables in
   isolated repositories to verify sequential handoff, the verifier completion
-  gate, read-only mutation detection, protected-state enforcement, and
-  credential leak publication blocking without network or real model
+  gate, read-only mutation detection, protected-state enforcement, credential
+  leak publication blocking, fenced/preamble-wrapped output recovery, and the
+  analyst `satisfied` terminal short-circuit, without network or real model
   credentials.
 - `test-installer.sh`: installs listeners into isolated repositories and verifies
   default rendering, custom engine/provider/private-engine rendering, YAML
