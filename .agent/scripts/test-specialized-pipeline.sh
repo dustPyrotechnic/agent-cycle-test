@@ -187,7 +187,7 @@ case "$task" in
   *"analyst phase"*)
     printf '%s\n' 'The requested change is not yet present.'
     printf '%s\n' '```json'
-    printf '%s\n' '{"status":"ready","task_type":"feature","summary":"Change app content.","evidence":["app.txt contains original"],"root_cause_or_rationale":"The requested content is absent.","implementation_plan":["Update app.txt"],"validation_plan":["grep changed app.txt"],"risks":[]}'
+    printf '%s\n' '{"status":"ready","task_type":"feature","summary":"Change app content.","evidence":["app.txt contains original"],"root_cause_or_rationale":"The requested content is absent.","implementation_plan":["Update app.txt"],"validation_plan":["grep -E '\''changed\|original'\'' app.txt"],"risks":[]}'
     printf '%s\n' '```'
     ;;
   *"implementer phase"*)
@@ -218,6 +218,7 @@ EOF
 chmod +x "${fenced_root}/bin/claude"
 run_fake_round "$fenced_root"
 test "$(jq -r '.status' "${fenced_root}/target/.agent_state/issues/1/result.json")" = complete
+test "$(jq -r '.validation_plan[0]' "${fenced_root}/target/.agent_state/issues/1/analysis.json")" = "grep -E 'changed\\|original' app.txt"
 grep -q changed "${fenced_root}/target/app.txt"
 
 satisfied_root="$(setup_scenario already-satisfied)"

@@ -64,11 +64,14 @@ require_command() {
 normalize_agent_json() {
   # Recover a single JSON object from a raw agent transcript in place. Models
   # sometimes wrap the required JSON in a Markdown code fence or prepend
-  # conversational preamble despite the contract; extract the JSON so the
-  # downstream contract check sees it. Leave the file unchanged when no
-  # parseable JSON can be recovered, so malformed output still fails loudly.
+  # conversational preamble despite the contract. They also occasionally put a
+  # shell-style escape such as \| inside a JSON string, which is invalid JSON.
+  # Extract the object and repair only invalid backslash escapes inside strings
+  # so the downstream contract check sees it. Leave the file unchanged when no
+  # parseable JSON can be recovered, so other malformed output still fails.
   local file="$1"
   local normalized="${file}.normalized"
+  local repaired="${file}.repaired"
 
   if jq -e . "$file" >/dev/null 2>&1; then
     return 0
@@ -78,9 +81,9 @@ normalize_agent_json() {
     /^[[:space:]]*```/ { fence++; next }
     fence == 1 { print }
     fence >= 2 { exit }
-  ' "$file" >"$normalized" && [[ -s "$normalized" ]] \
-    && jq -e . "$normalized" >/dev/null 2>&1; then
-    mv "$normalized" "$file"
+  ' "$file" >"$normalized" && normalize_json_candidate "$normalized" "$repaired"; then
+    mv "$repaired" "$file"
+    rm -f "$normalized"
     return 0
   fi
 
@@ -93,14 +96,58 @@ normalize_agent_json() {
       for (i = NR; i >= 1; i--) if (last == 0 && index(lines[i], "}")) last = i
       if (first && last >= first) for (i = first; i <= last; i++) print lines[i]
     }
-  ' "$file" >"$normalized" && [[ -s "$normalized" ]] \
-    && jq -e . "$normalized" >/dev/null 2>&1; then
-    mv "$normalized" "$file"
+  ' "$file" >"$normalized" && normalize_json_candidate "$normalized" "$repaired"; then
+    mv "$repaired" "$file"
+    rm -f "$normalized"
     return 0
   fi
 
-  rm -f "$normalized"
+  rm -f "$normalized" "$repaired"
   return 0
+}
+
+normalize_json_candidate() {
+  local candidate="$1"
+  local repaired="$2"
+
+  [[ -s "$candidate" ]] || return 1
+  if jq -e . "$candidate" >/dev/null 2>&1; then
+    cp "$candidate" "$repaired"
+    return 0
+  fi
+
+  awk '
+    {
+      output = ""
+      in_string = 0
+      escaped = 0
+      for (i = 1; i <= length($0); i++) {
+        char = substr($0, i, 1)
+        if (!in_string) {
+          output = output char
+          if (char == "\"") in_string = 1
+          continue
+        }
+        if (escaped) {
+          output = output char
+          escaped = 0
+          continue
+        }
+        if (char == "\\") {
+          next_char = substr($0, i + 1, 1)
+          if (index("\"\\/bfnrtu", next_char) == 0) output = output "\\"
+          output = output char
+          escaped = 1
+          continue
+        }
+        output = output char
+        if (char == "\"") in_string = 0
+      }
+      print output
+    }
+  ' "$candidate" >"$repaired"
+
+  jq -e . "$repaired" >/dev/null 2>&1
 }
 
 build_system_prompt() {
