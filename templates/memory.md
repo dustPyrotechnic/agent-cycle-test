@@ -6,7 +6,9 @@ central engine.
 - Root `install.sh` is the target-repository bootstrapper. It renders this
   module's listener template for a selected engine repository/ref, configures
   target repository settings through `gh`, and delegates missing secret input
-  directly to `gh secret set` without reading secret values itself.
+  directly to `gh secret set` without reading secret values itself. Remote
+  execution tries anonymous raw template download first, then authenticated
+  `gh api` so private engines remain installable.
 - `agent-cycle-listener.yml`: the target repository's listener. It reacts to
   `solve-it` labels, `agent-relay` dispatches, and manual runs, then calls the
   central `reusable-agent-cycle.yml`. It must declare `contents`, `issues`, and

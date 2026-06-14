@@ -44,19 +44,22 @@
 
 ## 接入目标仓库
 
-发布稳定的 `v1` tag 后，在任意目标仓库目录运行一条命令即可完成监听器安装、GitHub 仓库设置、`solve-it` 标签、可信作者变量和模型 Secret 检查，并只提交、推送监听器文件：
+当前中央引擎是私有仓库。发布稳定的 `v1` tag 后，在任意目标仓库目录运行以下一条认证命令，即可完成监听器安装、GitHub 仓库设置、`solve-it` 标签、可信作者变量和模型 Secret 检查，并只提交、推送监听器文件：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/dustPyrotechnic/agent-cycle-test/v1/install.sh) --commit
+bash <(gh api --method GET -H 'Accept: application/vnd.github.raw+json' repos/dustPyrotechnic/agent-cycle-test/contents/install.sh -f ref=v1) --private-engine --commit
 ```
 
-安装器要求本机已有 `git`、`gh` 和目标仓库的管理员权限。缺少 `DEEPSEEK_API_KEY` 时，它会调用 `gh secret set` 安全读取并加密 Secret，安装脚本本身不会读取或打印 Secret 内容。当前分支不是默认分支时，需要先合并该分支，监听器才会生效。
+安装器要求本机已有 `git`、已认证的 `gh` 和目标仓库的管理员权限。缺少 `DEEPSEEK_API_KEY` 或私有引擎所需的 `ENGINE_TOKEN` 时，它会调用 `gh secret set` 安全读取并加密 Secret，安装脚本本身不会读取或打印 Secret 内容。当前分支不是默认分支时，需要先合并该分支，监听器才会生效。
 
 引擎开发期间还没有稳定 tag 时，可以显式使用 `main`：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/dustPyrotechnic/agent-cycle-test/main/install.sh) --engine-ref main --commit
+bash <(gh api --method GET -H 'Accept: application/vnd.github.raw+json' repos/dustPyrotechnic/agent-cycle-test/contents/install.sh -f ref=main) --engine-ref main --private-engine --commit
 ```
+
+如果未来将中央引擎设为公开仓库，也可以改用匿名
+`bash <(curl -fsSL https://raw.githubusercontent.com/.../install.sh)` 形式。
 
 常用安装选项：
 

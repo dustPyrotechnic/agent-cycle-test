@@ -124,6 +124,27 @@ render_listener() {
     ' "$source" >"$destination"
 }
 
+download_listener_template() {
+  local destination="$1"
+  local raw_url="https://raw.githubusercontent.com/${ENGINE_REPOSITORY}/${ENGINE_REF}/templates/agent-cycle-listener.yml"
+
+  if command -v curl >/dev/null 2>&1 && curl -fsSL --retry 3 "$raw_url" -o "$destination"; then
+    return
+  fi
+
+  if command -v gh >/dev/null 2>&1; then
+    note "Anonymous download failed; retrying through authenticated gh api"
+    gh api \
+      --method GET \
+      -H "Accept: application/vnd.github.raw+json" \
+      "repos/${ENGINE_REPOSITORY}/contents/templates/agent-cycle-listener.yml" \
+      -f "ref=${ENGINE_REF}" >"$destination" &&
+      return
+  fi
+
+  fail "cannot download the listener template; authenticate gh for a private engine"
+}
+
 install_listener() (
   local script_dir=""
   local template=""
@@ -141,11 +162,8 @@ install_listener() (
   if [[ -n "$script_dir" && -f "${script_dir}/templates/agent-cycle-listener.yml" ]]; then
     cp "${script_dir}/templates/agent-cycle-listener.yml" "$template"
   else
-    require_command curl
     note "Downloading listener template from ${ENGINE_REPOSITORY}@${ENGINE_REF}"
-    curl -fsSL --retry 3 \
-      "https://raw.githubusercontent.com/${ENGINE_REPOSITORY}/${ENGINE_REF}/templates/agent-cycle-listener.yml" \
-      -o "$template"
+    download_listener_template "$template"
   fi
 
   if [[ "$PRIVATE_ENGINE" == true ]]; then

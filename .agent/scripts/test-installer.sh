@@ -68,4 +68,29 @@ for listener in "$default_listener" "$custom_listener"; do
   ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0))' "$listener"
 done
 
+remote_source="${test_root}/remote-source"
+remote_target="${test_root}/remote-target"
+remote_bin="${test_root}/remote-bin"
+mkdir -p "$remote_source" "$remote_bin"
+cp "${repo_root}/install.sh" "${remote_source}/install.sh"
+make_target "$remote_target"
+cat >"${remote_bin}/curl" <<'EOF'
+#!/usr/bin/env bash
+exit 22
+EOF
+cat >"${remote_bin}/gh" <<'EOF'
+#!/usr/bin/env bash
+cat "$FAKE_LISTENER_TEMPLATE"
+EOF
+chmod +x "${remote_bin}/curl" "${remote_bin}/gh"
+(
+  cd "$remote_target"
+  PATH="${remote_bin}:$PATH" \
+    FAKE_LISTENER_TEMPLATE="${repo_root}/templates/agent-cycle-listener.yml" \
+    bash "${remote_source}/install.sh" --engine-ref main --local-only >/dev/null 2>&1
+)
+remote_listener="${remote_target}/.github/workflows/agent-cycle.yml"
+assert_contains "    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@main" "$remote_listener"
+assert_contains "      engine_ref: main" "$remote_listener"
+
 echo "Installer tests passed"
