@@ -128,7 +128,8 @@ download_listener_template() {
   local destination="$1"
   local raw_url="https://raw.githubusercontent.com/${ENGINE_REPOSITORY}/${ENGINE_REF}/templates/agent-cycle-listener.yml"
 
-  if command -v curl >/dev/null 2>&1 && curl -fsSL --retry 3 "$raw_url" -o "$destination"; then
+  if command -v curl >/dev/null 2>&1 &&
+    curl -fsSL --retry 3 "$raw_url" -o "$destination" 2>/dev/null; then
     return
   fi
 
@@ -152,7 +153,9 @@ install_listener() (
   local private_engine="false"
 
   if [[ -f "${BASH_SOURCE[0]}" ]]; then
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+    if ! script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"; then
+      script_dir=""
+    fi
   fi
 
   template="$(mktemp)"
