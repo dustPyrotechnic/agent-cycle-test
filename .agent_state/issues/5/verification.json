@@ -1,0 +1,24 @@
+{
+  "status": "pass",
+  "summary": "All acceptance checks pass. install.sh correctly supports --version/-V: prints 'install.sh version v1', exits 0 before any dependency checks or file writes, and works outside a git repo. shellcheck and validate.sh pass cleanly. Changes are confined to install.sh only (3 additions: VERSION constant, usage line, case branch).",
+  "tests": [
+    "bash install.sh --version: prints 'install.sh version v1' and exits 0",
+    "bash install.sh -V: prints 'install.sh version v1' and exits 0",
+    "bash install.sh --engine-ref custom --version: prints installer version (not engine ref) and exits 0",
+    "bash install.sh --help: shows '-V, --version Show installer version and exit.' in usage",
+    "--version outside git repo (/tmp): exits 0 without git context errors",
+    "git status --porcelain after --version: no new files created/modified/deleted (beyond pre-existing implementation changes)",
+    "shellcheck install.sh: exit 0, no warnings",
+    "shellcheck .agent/scripts/*.sh: exit 0, no warnings",
+    "bash .agent/scripts/validate.sh: exit 0, all engine and installer tests pass"
+  ],
+  "acceptance_checks": [
+    "bash install.sh --version prints version string and exits 0: pass - outputs 'install.sh version v1', exit 0",
+    "bash install.sh -V matches --version: pass - identical output and exit code",
+    "--version path does not create/modify/delete files nor call gh/git: pass - exits before any dependency/git checks, git status stable",
+    "usage text shows --version/-V: pass - '-V, --version Show installer version and exit.' appears in --help output",
+    "shellcheck install.sh .agent/scripts/*.sh passes: pass - both exit 0 with zero warnings",
+    "bash .agent/scripts/validate.sh passes: pass - all specialized pipeline, installer, and engine config tests pass"
+  ],
+  "findings": []
+}

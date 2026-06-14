@@ -1,0 +1,34 @@
+{
+  "status": "ready",
+  "task_type": "feature",
+  "summary": "Install.sh needs --version/-V support to print the installer version and exit 0 before any dependency checks or file writes. The feature follows the existing --help short-circuit pattern and requires only localized additions in argument parsing and usage text.",
+  "evidence": [
+    "install.sh --version → 'error: unknown option: --version' (exit 1)",
+    "install.sh -V → 'error: unknown option: -V' (exit 1)",
+    "install.sh --help exits 0 before any git/gh calls (existing short-circuit pattern at lines 312-314)",
+    "shellcheck install.sh → exit 0 (clean baseline)",
+    "bash .agent/scripts/validate.sh → exit 0, all engine tests pass",
+    "No VERSION file or version constant exists anywhere in the repository",
+    "Script argument parsing loop (lines 270-320) uses a case statement; unknown options hit the *) fail handler",
+    "ENGINE_REF default is v1, providing a natural version anchor for the installer"
+  ],
+  "root_cause_or_rationale": "The installer lacks a version inspection entry point, so users cannot verify which installer version they have without triggering the full install flow. Adding --version/-V gives users a zero-side-effect way to identify the installer before running it.",
+  "implementation_plan": [
+    "Define a VERSION constant near the top of install.sh (after the other default variable declarations, around line 13): VERSION='v1'",
+    "Add a --version / -V case in the argument parsing loop (lines 312-314, immediately before or after the -h/--help case) that prints the version string and exits 0: printf 'install.sh version %s\\n' \"$VERSION\" ; exit 0",
+    "Add a usage line in the usage() function (around line 33) documenting the new option: -V, --version Show installer version and exit"
+  ],
+  "validation_plan": [
+    "bash install.sh --version → prints version string and exit 0",
+    "bash install.sh -V → prints version string and exit 0",
+    "Verify --version does not create/modify/delete any files: git status --porcelain → empty",
+    "Verify --version does not require git repository context (run outside a repo if possible): fails only on unknown option before, not on missing git repo",
+    "Verify -h/--help still works and shows the new --version/-V line",
+    "Verify --engine-ref custom --version still prints the installer version (not the engine ref) and exits 0",
+    "shellcheck install.sh → exit 0 with no warnings",
+    "bash .agent/scripts/validate.sh → exit 0 (installs listener, runs YAML parse, all tests pass)"
+  ],
+  "risks": [
+    "The issue does not specify the exact version string to print. 'v1' is proposed as it matches the engine's default ENGINE_REF and is the most natural choice, but maintainer may prefer a different scheme such as a numeric version or git-derived tag."
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "status": "ready_for_verification",
+  "summary": "Added --version/-V support to install.sh: VERSION constant, usage text entry, and short-circuit case in argument parsing that prints 'install.sh version v1' and exits 0 before any dependency checks or file writes.",
+  "changes": ["install.sh: added VERSION constant, --version/-V case, and usage text"],
+  "tests": [
+    "bash install.sh --version: prints 'install.sh version v1' and exits 0",
+    "bash install.sh -V: prints 'install.sh version v1' and exits 0",
+    "bash install.sh --engine-ref custom --version: prints installer version (not engine ref) and exits 0",
+    "bash install.sh --help: shows new '-V, --version' line in usage",
+    "shellcheck install.sh: exit 0, no warnings",
+    "shellcheck .agent/scripts/*.sh: exit 0, no warnings",
+    "bash .agent/scripts/validate.sh: exit 0, all engine and installer tests pass"
+  ],
+  "deviations": [],
+  "remaining_concerns": []
+}

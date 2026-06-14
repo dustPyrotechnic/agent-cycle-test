@@ -1,0 +1,7 @@
+{
+  "status": "complete",
+  "summary": "All acceptance checks verified independently. install.sh gained 6 lines: VERSION constant, usage text entry, and --version/-V short-circuit case. The feature prints 'install.sh version v1' and exits 0 before any dependency checks, file writes, or network calls. Only install.sh modified. shellcheck and validate.sh pass cleanly. No findings.",
+  "next_step": "The wrapper should commit the diff, push the agent/issue-5 branch, and create a PR.",
+  "tests": ["bash install.sh --version: prints 'install.sh version v1' exit 0", "bash install.sh -V: prints 'install.sh version v1' exit 0", "bash install.sh --engine-ref custom --version: prints installer version exit 0", "bash install.sh --help: shows -V/--version in usage", "--version outside git repo (/tmp): exits 0 without git errors", "shellcheck install.sh: exit 0 no warnings", "shellcheck .agent/scripts/*.sh: exit 0 no warnings", "bash .agent/scripts/validate.sh: exit 0 all tests pass"],
+  "findings": []
+}

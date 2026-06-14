@@ -11,6 +11,7 @@ FORCE=false
 LOCAL_ONLY=false
 COMMIT_AND_PUSH=false
 SKIP_SECRET_CHECK=false
+VERSION='v1'
 
 usage() {
   cat <<'EOF'
@@ -30,6 +31,7 @@ Options:
   --force                         Replace an existing listener workflow.
   --local-only                    Install the workflow without changing GitHub settings.
   --skip-secret-check             Do not check or prompt for required Actions secrets.
+  -V, --version                   Show installer version and exit.
   -h, --help                      Show this help.
 
 The normal installer creates the solve-it label, configures the trusted-author
@@ -308,6 +310,10 @@ while (($#)); do
     --skip-secret-check)
       SKIP_SECRET_CHECK=true
       shift
+      ;;
+    -V | --version)
+      printf 'install.sh version %s\n' "$VERSION"
+      exit 0
       ;;
     -h | --help)
       usage
