@@ -13,5 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Validate repository agent configuration
-        run: bash .agent/scripts/validate.sh
+      - name: Validate central engine configuration
+        run: bash .agent/scripts/validate-engine.sh
+      - name: Check shell scripts
+        run: shellcheck install.sh .agent/scripts/*.sh
+      - name: Check GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml templates/*.yml

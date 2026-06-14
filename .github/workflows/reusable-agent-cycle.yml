@@ -1,0 +1,141 @@
+name: Reusable Agent Cycle
+
+# Central, reusable engine. Target repositories call this workflow from their
+# own listener. All issue, branch, pull request, and dispatch operations use the
+# CALLING repository's context (github.repository and the caller GITHUB_TOKEN).
+# The engine's trusted scripts and prompt are checked out separately and run
+# from an out-of-tree snapshot, never from the target working tree.
+
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        required: true
+        type: string
+      provider:
+        required: false
+        default: deepseek
+        type: string
+      max_rounds:
+        required: false
+        default: "5"
+        type: string
+      trusted_associations:
+        required: false
+        default: OWNER
+        type: string
+      engine_repository:
+        description: Central engine repository (owner/name) to check out for .agent.
+        required: false
+        default: dustPyrotechnic/agent-cycle-test
+        type: string
+      engine_ref:
+        # There is no caller-independent context for a reusable workflow's own
+        # ref (github.workflow_ref resolves to the caller's listener), so the
+        # caller passes the engine ref and must keep it in sync with the @ref in
+        # its `uses:` line. Empty defaults to the caller commit, which is only
+        # correct for the engine repository's own self-listener.
+        description: Ref (tag or SHA) of the engine to check out; keep in sync with the uses@ref.
+        required: false
+        default: ""
+        type: string
+    secrets:
+      DEEPSEEK_API_KEY:
+        required: false
+      MIMO_API_KEY:
+        required: false
+      engine_token:
+        # Token used ONLY to check out the central engine repository. The caller
+        # GITHUB_TOKEN is scoped to the target repo and cannot read a private
+        # engine in another repository, even within the same organization. Pass a
+        # cross-repo PAT or GitHub App token here for private-engine deployments;
+        # public engines need nothing (checkout falls back to github.token).
+        required: false
+
+concurrency:
+  group: agent-cycle-${{ github.repository }}-${{ inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      ISSUE_NUMBER: ${{ inputs.issue_number }}
+      AGENT_PROVIDER: ${{ inputs.provider }}
+      MAX_ROUNDS: ${{ inputs.max_rounds }}
+      AGENT_ANALYSIS_TIMEOUT_MINUTES: "10"
+      AGENT_IMPLEMENTATION_TIMEOUT_MINUTES: "35"
+      AGENT_VERIFICATION_TIMEOUT_MINUTES: "10"
+      AGENT_REVIEW_TIMEOUT_MINUTES: "10"
+      TRUSTED_ASSOCIATIONS: ${{ inputs.trusted_associations }}
+
+    steps:
+      - name: Resolve engine ref and roots
+        id: engine
+        env:
+          ENGINE_REF: ${{ inputs.engine_ref }}
+        run: |
+          # The caller passes engine_ref (synced with its uses@ref). When empty
+          # it defaults to the run's commit, which is correct only when the
+          # engine repository calls itself.
+          ref="${ENGINE_REF:-$GITHUB_SHA}"
+          : "${ref:?could not resolve an engine ref}"
+          echo "ref=${ref}" >>"$GITHUB_OUTPUT"
+          # The runner context is unavailable in job-level env, so export the
+          # engine snapshot and target roots here for all later steps.
+          echo "ENGINE_ROOT=${RUNNER_TEMP}/agent-engine" >>"$GITHUB_ENV"
+          echo "TARGET_ROOT=${GITHUB_WORKSPACE}/target" >>"$GITHUB_ENV"
+
+      - name: Check out target repository
+        uses: actions/checkout@v6
+        with:
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out central engine
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.engine_repository }}
+          ref: ${{ steps.engine.outputs.ref }}
+          token: ${{ secrets.engine_token || github.token }}
+          path: engine
+          persist-credentials: false
+
+      - name: Snapshot privileged engine
+        run: |
+          cp -R engine/.agent "$ENGINE_ROOT"
+          chmod +x "$ENGINE_ROOT"/scripts/*.sh
+
+      - name: Configure scoped Git authentication
+        working-directory: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth setup-git
+
+      - name: Install pinned Claude Code
+        run: npm install --global @anthropic-ai/claude-code@2.1.177
+
+      - name: Prepare bounded round
+        id: prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$ENGINE_ROOT/scripts/prepare-round.sh"
+
+      - name: Run Claude Code round
+        id: agent
+        continue-on-error: true
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+        run: |
+          "$ENGINE_ROOT/scripts/run-round.sh"
+
+      - name: Finalize, publish, and relay
+        if: always() && steps.prepare.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$ENGINE_ROOT/scripts/finalize-round.sh"

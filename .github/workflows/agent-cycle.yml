@@ -1,5 +1,9 @@
 name: Agent Cycle
 
+# Central repository's own listener. It calls the reusable engine via a local
+# reference so this repository exercises the exact same production path that
+# target repositories use through their listener templates.
+
 on:
   issues:
     types: [labeled]
@@ -30,61 +34,18 @@ permissions:
   issues: write
   pull-requests: write
 
-concurrency:
-  group: agent-cycle-${{ github.event.issue.number || github.event.client_payload.issue_number || inputs.issue_number }}
-  cancel-in-progress: false
-
 jobs:
   cycle:
     if: >-
       github.event_name == 'repository_dispatch' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.label.name == 'solve-it')
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    env:
-      ISSUE_NUMBER: ${{ github.event.issue.number || github.event.client_payload.issue_number || inputs.issue_number }}
-      AGENT_PROVIDER: ${{ github.event.client_payload.provider || inputs.provider || 'deepseek' }}
-      MAX_ROUNDS: ${{ github.event.client_payload.max_rounds || inputs.max_rounds || '5' }}
-      AGENT_TIMEOUT_MINUTES: "35"
-      TRUSTED_ASSOCIATIONS: ${{ vars.AGENT_TRUSTED_ASSOCIATIONS || 'OWNER' }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Check out trusted default branch
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Snapshot privileged wrapper
-        run: |
-          cp -R .agent "$RUNNER_TEMP/agent-wrapper"
-          chmod +x "$RUNNER_TEMP"/agent-wrapper/scripts/*.sh
-
-      - name: Configure scoped Git authentication
-        run: gh auth setup-git
-
-      - name: Install pinned Claude Code
-        run: npm install --global @anthropic-ai/claude-code@2.1.177
-
-      - name: Prepare bounded round
-        id: prepare
-        env:
-          WRAPPER_ROOT: ${{ runner.temp }}/agent-wrapper
-        run: "$WRAPPER_ROOT/scripts/prepare-round.sh"
-
-      - name: Run Claude Code round
-        id: agent
-        continue-on-error: true
-        env:
-          WRAPPER_ROOT: ${{ runner.temp }}/agent-wrapper
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
-        run: "$WRAPPER_ROOT/scripts/run-round.sh"
-
-      - name: Finalize, publish, and relay
-        if: always() && steps.prepare.outcome == 'success'
-        env:
-          WRAPPER_ROOT: ${{ runner.temp }}/agent-wrapper
-        run: "$WRAPPER_ROOT/scripts/finalize-round.sh"
+    uses: ./.github/workflows/reusable-agent-cycle.yml
+    with:
+      issue_number: ${{ format('{0}', github.event.issue.number || github.event.client_payload.issue_number || inputs.issue_number) }}
+      provider: ${{ github.event.client_payload.provider || inputs.provider || 'deepseek' }}
+      max_rounds: ${{ format('{0}', github.event.client_payload.max_rounds || inputs.max_rounds || '5') }}
+      trusted_associations: ${{ vars.AGENT_TRUSTED_ASSOCIATIONS || 'OWNER' }}
+    secrets:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}

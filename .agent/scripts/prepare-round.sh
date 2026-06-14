@@ -4,6 +4,12 @@ set -euo pipefail
 : "${ISSUE_NUMBER:?ISSUE_NUMBER is required}"
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
+# Trusted engine scripts/prompts are read from ENGINE_ROOT; every git and gh
+# operation runs against the target repository checked out at TARGET_ROOT.
+ENGINE_ROOT="${ENGINE_ROOT:-${WRAPPER_ROOT:-.agent}}"
+TARGET_ROOT="${TARGET_ROOT:-$(git rev-parse --show-toplevel)}"
+cd "$TARGET_ROOT"
+
 if [[ ! "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "ISSUE_NUMBER must be numeric" >&2
   exit 1

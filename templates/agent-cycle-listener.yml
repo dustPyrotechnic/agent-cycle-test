@@ -1,0 +1,72 @@
+name: Agent Cycle
+
+# Target repository listener. Copy this file to .github/workflows/agent-cycle.yml
+# in any repository you want the central engine to operate on.
+#
+# Setup checklist for the target repository:
+#   - Enable GitHub Actions.
+#   - Settings -> Actions -> General -> enable
+#     "Allow GitHub Actions to create and approve pull requests".
+#   - Create the `solve-it` label.
+#   - Add the `DEEPSEEK_API_KEY` Actions secret (and optional `MIMO_API_KEY`).
+#   - Ensure the central engine repository is accessible from this repository.
+#     A public engine needs nothing extra. A PRIVATE engine cannot be checked out
+#     with the default GITHUB_TOKEN (it is scoped to this repo only, even within
+#     the same organization): add an ENGINE_TOKEN secret holding a cross-repo PAT
+#     or GitHub App token and uncomment the `engine_token` line below.
+#
+# Pin the engine to a release tag or commit SHA in production. Use @main only
+# while developing the engine itself.
+
+on:
+  issues:
+    types: [labeled]
+  repository_dispatch:
+    types: [agent-relay]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Existing solve-it issue number
+        required: true
+        type: string
+      provider:
+        description: Anthropic-compatible model provider
+        required: true
+        default: deepseek
+        type: choice
+        options:
+          - deepseek
+          - mimo
+      max_rounds:
+        description: Hard maximum number of rounds
+        required: true
+        default: "5"
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  cycle:
+    if: >-
+      github.event_name == 'repository_dispatch' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.label.name == 'solve-it')
+    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@v1
+    with:
+      issue_number: ${{ format('{0}', github.event.issue.number || github.event.client_payload.issue_number || inputs.issue_number) }}
+      provider: ${{ github.event.client_payload.provider || inputs.provider || 'deepseek' }}
+      max_rounds: ${{ format('{0}', github.event.client_payload.max_rounds || inputs.max_rounds || '5') }}
+      trusted_associations: ${{ vars.AGENT_TRUSTED_ASSOCIATIONS || 'OWNER' }}
+      # Must match the @ref pinned in `uses:` above. A reusable workflow cannot
+      # discover its own ref, so the engine .agent code is checked out at this ref.
+      engine_repository: dustPyrotechnic/agent-cycle-test
+      engine_ref: v1
+    secrets:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+      # Uncomment only if the central engine is a PRIVATE repository in another
+      # owner/organization; provide a cross-repo PAT or App token.
+      # engine_token: ${{ secrets.ENGINE_TOKEN }}

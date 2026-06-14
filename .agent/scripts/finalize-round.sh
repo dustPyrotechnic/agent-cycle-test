@@ -4,13 +4,35 @@ set -euo pipefail
 : "${ISSUE_NUMBER:?ISSUE_NUMBER is required}"
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
+# Trusted engine snapshot is read from ENGINE_ROOT; all git, gh, and dispatch
+# operations run against the target repository checked out at TARGET_ROOT.
+ENGINE_ROOT="${ENGINE_ROOT:-${WRAPPER_ROOT:-.agent}}"
+TARGET_ROOT="${TARGET_ROOT:-$(git rev-parse --show-toplevel)}"
+cd "$TARGET_ROOT"
+
 STATE_DIR=".agent_state/issues/${ISSUE_NUMBER}"
 RESULT_FILE="${STATE_DIR}/result.json"
 STATE_FILE="${STATE_DIR}/state.json"
 AGENT_PROVIDER="${AGENT_PROVIDER:-deepseek}"
 
-if [[ -f "${WRAPPER_ROOT:-.agent}/credential-leak-detected" ]]; then
+if [[ -f "${ENGINE_ROOT}/credential-leak-detected" ]]; then
   gh issue comment "$ISSUE_NUMBER" --body "The agent cycle stopped because a configured model credential appeared in the working tree. No agent changes were committed or pushed. Rotate the affected credential and inspect the failed run before retrying." >/dev/null
+  gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
+  gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
+  gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
+  exit 1
+fi
+
+if [[ -f "${ENGINE_ROOT}/readonly-phase-mutation-detected" ]]; then
+  gh issue comment "$ISSUE_NUMBER" --body "The agent cycle stopped because a read-only analyst, verifier, or reviewer modified the target working tree. No agent changes were committed or pushed. Inspect the failed run and role prompt before retrying." >/dev/null
+  gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
+  gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
+  gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
+  exit 1
+fi
+
+if [[ -f "${ENGINE_ROOT}/protected-state-mutation-detected" ]]; then
+  gh issue comment "$ISSUE_NUMBER" --body "The agent cycle stopped because the implementer modified wrapper-owned .agent_state/issues content. No agent changes were committed or pushed. Inspect the failed run and role prompt before retrying." >/dev/null
   gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
   gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
   gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
@@ -23,12 +45,15 @@ if ! jq -e '
   and (.next_step | type == "string")
   and (.tests | type == "array")
   and all(.tests[]; type == "string")
+  and (.findings | type == "array")
+  and all(.findings[]; type == "string")
 ' "$RESULT_FILE" >/dev/null 2>&1; then
   jq -n '{
     status: "blocked",
     summary: "The agent did not produce a result matching the required schema.",
     next_step: "Inspect the workflow log and correct the agent result contract.",
-    tests: []
+    tests: [],
+    findings: ["critical: invalid final reviewer result contract"]
   }' >"$RESULT_FILE"
 fi
 
@@ -70,20 +95,21 @@ if [[ ! -s "${STATE_DIR}/handoff.md" ]]; then
 fi
 
 set +e
-validation_output="$("${WRAPPER_ROOT:-.agent}/scripts/validate.sh" 2>&1)"
+validation_output="$(TARGET_ROOT="$TARGET_ROOT" bash "${ENGINE_ROOT}/scripts/validate-target.sh" 2>&1)"
 validation_status=$?
 set -e
 printf '%s\n' "$validation_output"
 
 if [[ "$validation_status" -ne 0 ]]; then
   status="blocked"
-  summary="${summary} Repository agent configuration validation failed."
+  summary="${summary} Target repository validation failed."
   jq \
     --arg summary "$summary" \
     '.status = "blocked"
      | .summary = $summary
-     | .next_step = "Inspect and fix the repository agent configuration validation failure."
-     | .tests += ["bash .agent/scripts/validate.sh: failed"]' \
+     | .next_step = "Inspect and fix the target repository validation failure."
+     | .tests += ["validate-target.sh: failed"]
+     | .findings += ["critical: target repository static validation failed"]' \
     "$RESULT_FILE" >"${RESULT_FILE}.tmp"
   mv "${RESULT_FILE}.tmp" "$RESULT_FILE"
   jq \
@@ -101,10 +127,13 @@ if ! git diff --cached --quiet; then
 fi
 git push --set-upstream origin "$branch"
 
+pr_body=""
+comment_file=""
+trap 'rm -f "$pr_body" "$comment_file"' EXIT
+
 pr_url="$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
 if [[ -z "$pr_url" ]]; then
   pr_body="$(mktemp)"
-  trap 'rm -f "$pr_body"' EXIT
   cat >"$pr_body" <<EOF
 Automated bounded agent cycle for issue #${ISSUE_NUMBER}.
 
@@ -125,8 +154,8 @@ EOF
 fi
 
 comment_file="$(mktemp)"
-trap 'rm -f "$comment_file"' EXIT
 tests="$(jq -r 'if (.tests | length) == 0 then "- Not reported" else .tests[] | "- " + . end' "$RESULT_FILE")"
+findings="$(jq -r 'if (.findings | length) == 0 then "- None reported" else .findings[] | "- " + . end' "$RESULT_FILE")"
 next_step="$(jq -r '.next_step' "$RESULT_FILE")"
 cat >"$comment_file" <<EOF
 Agent cycle round **${round}/${max_rounds}** finished with status **${status}**.
@@ -135,6 +164,9 @@ ${summary}
 
 Tests:
 ${tests}
+
+Findings:
+${findings}
 
 Next step: ${next_step}
 

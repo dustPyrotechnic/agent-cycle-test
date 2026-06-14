@@ -8,6 +8,20 @@ body:
     attributes:
       value: |
         The agent works in bounded rounds and publishes changes through a pull request.
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: Task type
+      description: Select the closest pipeline classification.
+      options:
+        - Bug
+        - Feature
+        - Refactor
+        - Build or CI
+        - Documentation
+        - Mixed
+    validations:
+      required: true
   - type: textarea
     id: outcome
     attributes:
@@ -16,6 +30,16 @@ body:
       placeholder: What should be true when this issue is complete?
     validations:
       required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Reproduction and evidence
+      description: For bugs, provide reproduction steps, expected behavior, actual behavior, and relevant logs. Do not include credentials.
+      placeholder: |
+        1. Run command X
+        2. Observe Y instead of Z
+    validations:
+      required: false
   - type: textarea
     id: acceptance
     attributes:
