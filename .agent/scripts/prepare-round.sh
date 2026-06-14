@@ -43,10 +43,9 @@ case ",${TRUSTED_ASSOCIATIONS}," in
     ;;
 esac
 
-if ! jq -e 'any(.labels[]?; .name == "solve-it")' "$ISSUE_JSON" >/dev/null; then
-  echo "Issue #${ISSUE_NUMBER} does not have the solve-it label" >&2
-  exit 1
-fi
+# Every issue is eligible once it clears the trust gate; no opt-in label is
+# required. The listener triggers on opened/reopened/edited (and an optional
+# solve-it label), so the cycle recognizes all issues, not a special class.
 
 default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
 branch="agent/issue-${ISSUE_NUMBER}"

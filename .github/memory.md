@@ -2,7 +2,7 @@
 
 GitHub is the control plane for the agent cycle.
 
-- Opt-in label: `solve-it`
+- Trigger: every issue (`opened`/`reopened`/`edited`). `solve-it` is an optional manual re-run label, not a requirement.
 - Runtime labels: `agent-running`, `agent-done`, `agent-blocked`
 - Task branch convention: `agent/issue-<number>`
 - Pull requests target the current default branch.

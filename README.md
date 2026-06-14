@@ -2,7 +2,7 @@
 
 [![Validate Agent Configuration](https://github.com/dustPyrotechnic/agent-cycle-test/actions/workflows/validate.yml/badge.svg)](https://github.com/dustPyrotechnic/agent-cycle-test/actions/workflows/validate.yml)
 
-这是一个由 GitHub Issue 驱动的有界自循环编码代理，并且是一个**中央可复用引擎**：每个目标仓库只需安装一个小型监听器并配置模型密钥，即可通过该仓库的 `solve-it` Issue 启动代理。维护者给 Issue 添加 `solve-it` 标签后，目标仓库的监听器调用中央 `reusable-agent-cycle.yml`，代理在目标仓库的独立分支完成一个可审查增量，包装脚本持久化状态、创建 Pull Request，并在需要时通过 `repository_dispatch` 接力下一轮。
+这是一个由 GitHub Issue 驱动的有界自循环编码代理，并且是一个**中央可复用引擎**：每个目标仓库只需安装一个小型监听器并配置模型密钥，即可让代理识别该仓库的**所有** Issue。新建（或重新打开、编辑）任意 Issue 即触发，无需专门的标签或模板；真正放行哪些 Issue 由信任门控（`author_association`，默认仅 `OWNER`）决定。目标仓库的监听器调用中央 `reusable-agent-cycle.yml`，代理在目标仓库的独立分支完成一个可审查增量，包装脚本持久化状态、创建 Pull Request，并在需要时通过 `repository_dispatch` 接力下一轮。
 
 可复用工作流运行在**调用仓库**的 `github` 上下文和 `GITHUB_TOKEN` 下，因此所有 Issue、分支、PR 和接力操作都作用于目标仓库，而非引擎仓库。中央仓库自己的 `agent-cycle.yml` 通过本地 `./` 引用调用同一个可复用引擎，与目标仓库走完全相同的生产路径。
 
@@ -34,13 +34,12 @@
 
 ## 使用方法
 
-1. 创建 Issue，明确期望结果与验收检查。
-2. 添加 `solve-it` 标签，或使用 `Agent task` Issue 模板自动添加。
-3. 在 Actions 中观察 `Agent Cycle`。
-4. 在生成的 Pull Request 中审查实现和每轮状态。
-5. 合并 Pull Request 后，`Closes #<issue>` 会关闭 Issue。
+1. 创建 Issue，明确期望结果与验收检查。新建 Issue 即自动触发，无需任何标签或模板。
+2. 在 Actions 中观察 `Agent Cycle`。
+3. 在生成的 Pull Request 中审查实现和每轮状态。
+4. 合并 Pull Request 后，`Closes #<issue>` 会关闭 Issue。
 
-如需人工重跑，先确保 Issue 带有 `solve-it`，再从 Actions 手动运行工作流并选择 Issue 编号、提供商和轮数上限。
+如需对已有 Issue 人工重跑，可重新打开/编辑该 Issue、给它打上 `solve-it` 标签，或从 Actions 手动运行工作流并选择 Issue 编号、提供商和轮数上限。
 
 ## 接入目标仓库
 

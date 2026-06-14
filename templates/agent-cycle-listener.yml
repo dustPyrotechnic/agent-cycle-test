@@ -7,7 +7,6 @@ name: Agent Cycle
 #   - Enable GitHub Actions.
 #   - Settings -> Actions -> General -> enable
 #     "Allow GitHub Actions to create and approve pull requests".
-#   - Create the `solve-it` label.
 #   - Add the `DEEPSEEK_API_KEY` Actions secret (and optional `MIMO_API_KEY`).
 #   - Ensure the central engine repository is accessible from this repository.
 #     A public engine needs nothing extra. A PRIVATE engine cannot be checked out
@@ -20,13 +19,15 @@ name: Agent Cycle
 
 on:
   issues:
-    types: [labeled]
+    # Every issue is recognized. opened/reopened/edited start or re-run a round;
+    # labeled is kept only so an optional solve-it label can re-trigger manually.
+    types: [opened, reopened, edited, labeled]
   repository_dispatch:
     types: [agent-relay]
   workflow_dispatch:
     inputs:
       issue_number:
-        description: Existing solve-it issue number
+        description: Existing issue number
         required: true
         type: string
       provider:
@@ -53,7 +54,8 @@ jobs:
     if: >-
       github.event_name == 'repository_dispatch' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' && github.event.label.name == 'solve-it')
+      (github.event_name == 'issues' && github.event.action != 'labeled') ||
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'solve-it')
     uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@v1
     with:
       issue_number: ${{ format('{0}', github.event.issue.number || github.event.client_payload.issue_number || inputs.issue_number) }}

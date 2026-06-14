@@ -54,8 +54,12 @@ for file in "${required_files[@]}"; do
   }
 done
 
-ruby -e 'require "yaml"; ARGV.each { |file| YAML.parse_file(file) }' \
-  .github/workflows/*.yml .github/ISSUE_TEMPLATE/*.yml templates/*.yml
+# ISSUE_TEMPLATE may legitimately hold no YAML templates; expand globs with
+# nullglob so an empty directory does not pass a literal pattern to Ruby.
+shopt -s nullglob
+yaml_files=(.github/workflows/*.yml .github/ISSUE_TEMPLATE/*.yml templates/*.yml)
+shopt -u nullglob
+ruby -e 'require "yaml"; ARGV.each { |file| YAML.parse_file(file) }' "${yaml_files[@]}"
 
 ruby -e '
   require "yaml"

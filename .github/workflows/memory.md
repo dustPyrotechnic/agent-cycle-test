@@ -18,11 +18,14 @@ Two more constraints apply:
 
 ## Agent Cycle (central self-listener)
 
-`agent-cycle.yml` is the central repository's own listener. It calls `reusable-agent-cycle.yml` via a local `./` reference so the engine exercises the same production path as targets. It runs only for:
+`agent-cycle.yml` is the central repository's own listener. It calls `reusable-agent-cycle.yml` via a local `./` reference so the engine exercises the same production path as targets. It runs for:
 
-- A `solve-it` label event.
+- Any issue `opened`, `reopened`, or `edited` event.
+- A `labeled` event only when the label is `solve-it` (optional manual re-run).
 - A validated `agent-relay` repository dispatch.
-- A manual dispatch for an existing `solve-it` issue.
+- A manual `workflow_dispatch` for an existing issue number.
+
+Every issue is recognized; `prepare-round.sh`'s trust gate, not a label, decides which issues actually run.
 
 The reusable engine copies `.agent` to runner temporary storage before the model runs. All privileged preparation and finalization use this snapshot.
 

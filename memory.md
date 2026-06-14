@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The repository is a central, reusable engine for a safe-by-default, issue-driven coding loop on GitHub Actions. A maintainer opts an issue in with the `solve-it` label in a target repository. Each run performs one bounded four-session agent round, persists state on `agent/issue-<number>` in the target repository, and either completes, blocks, or relays through `repository_dispatch`.
+The repository is a central, reusable engine for a safe-by-default, issue-driven coding loop on GitHub Actions. The listener recognizes every issue (opened/reopened/edited, plus an optional `solve-it` label for manual re-runs); the trust gate in `prepare-round.sh` (`author_association` in `TRUSTED_ASSOCIATIONS`, default `OWNER`) decides which issues actually run. Each run performs one bounded four-session agent round, persists state on `agent/issue-<number>` in the target repository, and either completes, blocks, or relays through `repository_dispatch`.
 
 ## Architecture
 

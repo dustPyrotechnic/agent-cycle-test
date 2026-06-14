@@ -32,9 +32,11 @@ Options:
   --skip-secret-check             Do not check or prompt for required Actions secrets.
   -h, --help                      Show this help.
 
-The normal installer creates the solve-it label, configures the trusted-author
-variable, enables Actions and Actions-created pull requests, and securely asks
-gh to set a missing provider secret. Secret values are never read by this script.
+The listener recognizes every issue; the optional solve-it label only re-runs an
+existing one. The normal installer still creates that label, configures the
+trusted-author variable, enables Actions and Actions-created pull requests, and
+securely asks gh to set a missing provider secret. Secret values are never read
+by this script.
 EOF
 }
 
@@ -262,7 +264,7 @@ commit_listener() {
   if [[ "$LOCAL_ONLY" != true ]]; then
     default_branch="$(gh repo view "$TARGET_REPOSITORY" --json defaultBranchRef --jq '.defaultBranchRef.name')"
     if [[ "$branch" != "$default_branch" ]]; then
-      note "Pushed ${branch}; merge it into ${default_branch} before using solve-it"
+      note "Pushed ${branch}; merge it into ${default_branch} before opening issues for the agent"
     fi
   fi
 }
@@ -360,5 +362,5 @@ Trusted associations: ${TRUSTED_ASSOCIATIONS}
 EOF
 
 if [[ "$COMMIT_AND_PUSH" != true ]]; then
-  printf 'Commit and push %s before adding solve-it to an issue.\n' "$WORKFLOW_PATH"
+  printf 'Commit and push %s before opening issues for the agent.\n' "$WORKFLOW_PATH"
 fi

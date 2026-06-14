@@ -10,8 +10,9 @@ central engine.
   execution tries anonymous raw template download first, then authenticated
   `gh api` so private engines remain installable.
 - `agent-cycle-listener.yml`: the target repository's listener. It reacts to
-  `solve-it` labels, `agent-relay` dispatches, and manual runs, then calls the
-  central `reusable-agent-cycle.yml`. It must declare `contents`, `issues`, and
+  every issue (`opened`/`reopened`/`edited`), an optional `solve-it` `labeled`
+  event for manual re-runs, `agent-relay` dispatches, and manual runs, then calls
+  the central `reusable-agent-cycle.yml`. It must declare `contents`, `issues`, and
   `pull-requests` write permissions and pass model secrets explicitly; reusable
   workflows do not inherit caller secrets without an explicit `secrets:` block.
 - Production listeners must pin the engine to a release tag or commit SHA. `@main`

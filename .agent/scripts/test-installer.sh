@@ -28,6 +28,7 @@ make_target "$default_target"
   bash "${repo_root}/install.sh" --local-only >/dev/null
 )
 default_listener="${default_target}/.github/workflows/agent-cycle.yml"
+assert_contains "    types: [opened, reopened, edited, labeled]" "$default_listener"
 assert_contains "    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@v1" "$default_listener"
 assert_contains "      engine_repository: dustPyrotechnic/agent-cycle-test" "$default_listener"
 assert_contains "      engine_ref: v1" "$default_listener"
