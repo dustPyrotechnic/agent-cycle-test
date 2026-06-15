@@ -25,10 +25,8 @@ implementation brief for a different agent.
 
 ## Reply Language
 
-Detect the dominant natural language of the issue snapshot (title and body) and
-write every natural-language string you emit in that same language. For example,
-respond in Chinese to a Chinese issue and in English to an English issue; when
-the issue mixes languages, follow its dominant one. This applies to the prose
+Write every natural-language string you emit in Chinese, regardless of the
+issue's language, as required by the central contract. This applies to the prose
 inside the JSON fields (`summary`, `evidence`, `root_cause_or_rationale`,
 `implementation_plan`, `validation_plan`, `risks`). Keep the JSON keys, status
 enums, and any code, commands, file paths, and identifiers unchanged.

@@ -319,10 +319,10 @@ finish_round() {
     touch "$leak_sentinel"
     jq -n '{
       status: "blocked",
-      summary: "A configured model credential appeared in the working tree, so no changes were published.",
-      next_step: "Rotate the affected credential and inspect the failed run before retrying.",
+      summary: "工作树中出现了配置的模型凭据，因此未发布任何改动。",
+      next_step: "请轮换受影响的凭据，并在重试前检查失败的运行。",
       tests: [],
-      findings: ["critical: configured model credential detected in the working tree"]
+      findings: ["critical: 工作树中检测到配置的模型凭据"]
     }' >"$RESULT_FILE"
   fi
   unset ANTHROPIC_AUTH_TOKEN
@@ -428,12 +428,12 @@ set -e
 if [[ "$analyst_status" -ne 0 || ! -s "$ANALYST_OUTPUT" ]]; then
   if [[ "$analyst_status" -eq 124 ]]; then
     write_runtime_result continue \
-      "The analyst agent reached its timeout before producing an implementation brief." \
-      "Resume analysis from the current issue and previous handoff."
+      "分析师 agent 在产出实施简报前已超时。" \
+      "下一轮从当前 issue 与上一份 handoff 继续分析。"
   else
     write_runtime_result blocked \
-      "The analyst agent failed before producing an implementation brief (exit ${analyst_status})." \
-      "Inspect the workflow log and fix the analyst runtime or prompt contract."
+      "分析师 agent 在产出实施简报前失败（退出码 ${analyst_status}）。" \
+      "检查工作流日志，修复分析师的运行时或提示词契约。"
   fi
   finish_round
 fi
@@ -461,8 +461,8 @@ if ! jq -e '
   and (.status != "insufficient_evidence" or (.implementation_plan | length) == 0)
 ' "$ANALYST_OUTPUT" >/dev/null 2>&1; then
   write_runtime_result blocked \
-    "The analyst did not produce a result matching the required JSON contract." \
-    "Inspect the workflow log and correct the analyst prompt or runtime."
+    "分析师未产出符合所需 JSON 契约的结果。" \
+    "检查工作流日志，修正分析师的提示词或运行时。"
   finish_round
 fi
 cp "$ANALYST_OUTPUT" "$ANALYSIS_FILE"
@@ -470,7 +470,7 @@ cp "$ANALYST_OUTPUT" "$ANALYSIS_FILE"
 if [[ "$(jq -r '.status' "$ANALYSIS_FILE")" == "blocked" ]]; then
   write_runtime_result blocked \
     "$(jq -r '.summary' "$ANALYSIS_FILE")" \
-    "Resolve the analyst-reported risks or unavailable dependency before retrying."
+    "在重试前解决分析师报告的风险或不可用依赖。"
   finish_round
 fi
 
@@ -481,7 +481,7 @@ if [[ "$(jq -r '.status' "$ANALYSIS_FILE")" == "satisfied" ]]; then
   jq '{
     status: "complete",
     summary: .summary,
-    next_step: "No code change was required; the requested outcome was already satisfied.",
+    next_step: "无需代码改动；所请求的结果已经满足。",
     tests: .validation_plan,
     findings: .evidence
   }' "$ANALYSIS_FILE" >"$RESULT_FILE"
@@ -542,8 +542,8 @@ state_after_implementer="$(state_tree_fingerprint)"
 if [[ "$state_before_implementer" != "$state_after_implementer" ]]; then
   touch "${ENGINE_ROOT}/protected-state-mutation-detected"
   write_runtime_result blocked \
-    "The implementer modified wrapper-owned .agent_state/issues content." \
-    "Inspect the failed run and correct the implementer prompt or runtime."
+    "实施者修改了 wrapper 所有的 .agent_state/issues 内容。" \
+    "检查失败的运行，修正实施者的提示词或运行时。"
   finish_round
 fi
 
@@ -563,8 +563,8 @@ if [[ -s "$IMPLEMENTER_OUTPUT" ]]; then
     and (.status != "ready_for_verification" or (.changes | length) > 0)
   ' "$IMPLEMENTER_OUTPUT" >/dev/null 2>&1; then
     write_runtime_result blocked \
-      "The implementer did not produce a result matching the required JSON contract." \
-      "Inspect the workflow log and correct the implementer prompt or runtime."
+      "实施者未产出符合所需 JSON 契约的结果。" \
+      "检查工作流日志，修正实施者的提示词或运行时。"
     finish_round
   fi
   cp "$IMPLEMENTER_OUTPUT" "$IMPLEMENTATION_FILE"
@@ -573,11 +573,11 @@ else
     --arg status "$implementer_status" \
     '{
       status: "blocked",
-      summary: ("The implementer exited without a report (exit " + $status + ")."),
+      summary: ("实施者退出但未产出报告（退出码 " + $status + "）。"),
       changes: [],
       tests: [],
       deviations: [],
-      remaining_concerns: ["Review the actual working tree for partial changes."]
+      remaining_concerns: ["检查实际工作树是否有部分改动。"]
     }' >"$IMPLEMENTATION_FILE"
 fi
 
@@ -607,12 +607,12 @@ set -e
 if [[ "$verifier_status" -ne 0 || ! -s "$VERIFIER_OUTPUT" ]]; then
   if [[ "$verifier_status" -eq 124 ]]; then
     write_runtime_result continue \
-      "The verifier agent reached its timeout before producing independent evidence." \
-      "Resume verification of the current implementation in the next round."
+      "验证者 agent 在产出独立证据前已超时。" \
+      "下一轮继续对当前实现进行验证。"
   else
     write_runtime_result blocked \
-      "The verifier agent failed before producing independent evidence (exit ${verifier_status})." \
-      "Inspect the workflow log and fix the verifier runtime or prompt contract."
+      "验证者 agent 在产出独立证据前失败（退出码 ${verifier_status}）。" \
+      "检查工作流日志，修复验证者的运行时或提示词契约。"
   fi
   finish_round
 fi
@@ -631,8 +631,8 @@ if ! jq -e '
   and (.status != "pass" or (.acceptance_checks | length) > 0)
 ' "$VERIFIER_OUTPUT" >/dev/null 2>&1; then
   write_runtime_result blocked \
-    "The verifier did not produce a result matching the required JSON contract." \
-    "Inspect the workflow log and correct the verifier prompt or runtime."
+    "验证者未产出符合所需 JSON 契约的结果。" \
+    "检查工作流日志，修正验证者的提示词或运行时。"
   finish_round
 fi
 cp "$VERIFIER_OUTPUT" "$VERIFICATION_FILE"
@@ -664,12 +664,12 @@ set -e
 if [[ "$reviewer_status" -ne 0 || ! -s "$REVIEWER_OUTPUT" ]]; then
   if [[ "$reviewer_status" -eq 124 ]]; then
     write_runtime_result continue \
-      "The reviewer agent reached its timeout before deciding the round status." \
-      "Review the current diff and implementation report in the next round."
+      "复审者 agent 在判定本轮状态前已超时。" \
+      "下一轮再审查当前 diff 与实施报告。"
   else
     write_runtime_result blocked \
-      "The reviewer agent failed before deciding the round status (exit ${reviewer_status})." \
-      "Inspect the workflow log and fix the reviewer runtime or prompt contract."
+      "复审者 agent 在判定本轮状态前失败（退出码 ${reviewer_status}）。" \
+      "检查工作流日志，修复复审者的运行时或提示词契约。"
   fi
   finish_round
 fi
@@ -689,8 +689,8 @@ if ! jq -e --arg verification_status "$verification_status" '
   and ($verification_status != "blocked" or .status == "blocked")
 ' "$REVIEWER_OUTPUT" >/dev/null 2>&1; then
   write_runtime_result blocked \
-    "The reviewer did not produce a result matching the required JSON contract." \
-    "Inspect the workflow log and correct the reviewer prompt or runtime."
+    "复审者未产出符合所需 JSON 契约的结果。" \
+    "检查工作流日志，修正复审者的提示词或运行时。"
   finish_round
 fi
 

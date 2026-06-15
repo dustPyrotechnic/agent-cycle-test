@@ -16,7 +16,7 @@ STATE_FILE="${STATE_DIR}/state.json"
 AGENT_PROVIDER="${AGENT_PROVIDER:-deepseek}"
 
 if [[ -f "${ENGINE_ROOT}/credential-leak-detected" ]]; then
-  gh issue comment "$ISSUE_NUMBER" --body "The agent cycle stopped because a configured model credential appeared in the working tree. No agent changes were committed or pushed. Rotate the affected credential and inspect the failed run before retrying." >/dev/null
+  gh issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：工作树中出现了配置的模型凭据。未提交或推送任何 agent 改动。请轮换受影响的凭据，并在重试前检查失败的运行。" >/dev/null
   gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
   gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
   gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
@@ -24,7 +24,7 @@ if [[ -f "${ENGINE_ROOT}/credential-leak-detected" ]]; then
 fi
 
 if [[ -f "${ENGINE_ROOT}/readonly-phase-mutation-detected" ]]; then
-  gh issue comment "$ISSUE_NUMBER" --body "The agent cycle stopped because a read-only analyst, verifier, or reviewer modified the target working tree. No agent changes were committed or pushed. Inspect the failed run and role prompt before retrying." >/dev/null
+  gh issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：只读的分析师、验证者或复审者修改了目标工作树。未提交或推送任何 agent 改动。请在重试前检查失败的运行与角色提示词。" >/dev/null
   gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
   gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
   gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
@@ -32,7 +32,7 @@ if [[ -f "${ENGINE_ROOT}/readonly-phase-mutation-detected" ]]; then
 fi
 
 if [[ -f "${ENGINE_ROOT}/protected-state-mutation-detected" ]]; then
-  gh issue comment "$ISSUE_NUMBER" --body "The agent cycle stopped because the implementer modified wrapper-owned .agent_state/issues content. No agent changes were committed or pushed. Inspect the failed run and role prompt before retrying." >/dev/null
+  gh issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：实施者修改了 wrapper 所有的 .agent_state/issues 内容。未提交或推送任何 agent 改动。请在重试前检查失败的运行与角色提示词。" >/dev/null
   gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
   gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
   gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
@@ -50,10 +50,10 @@ if ! jq -e '
 ' "$RESULT_FILE" >/dev/null 2>&1; then
   jq -n '{
     status: "blocked",
-    summary: "The agent did not produce a result matching the required schema.",
-    next_step: "Inspect the workflow log and correct the agent result contract.",
+    summary: "Agent 未产出符合所需 schema 的结果。",
+    next_step: "检查工作流日志并修正 agent 的结果契约。",
     tests: [],
-    findings: ["critical: invalid final reviewer result contract"]
+    findings: ["critical: 最终复审结果契约无效"]
   }' >"$RESULT_FILE"
 fi
 
@@ -74,11 +74,11 @@ run_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/r
 
 if [[ "$status" == "continue" && "$round" -ge "$max_rounds" ]]; then
   status="blocked"
-  summary="${summary} The configured ${max_rounds}-round limit has been reached."
+  summary="${summary} 已达到配置的 ${max_rounds} 轮上限。"
   jq \
     --arg status "$status" \
     --arg summary "$summary" \
-    --arg next_step "Review the pull request and re-add solve-it only after deciding how to continue." \
+    --arg next_step "请审查该 pull request，决定如何继续后再重新添加 solve-it 标签。" \
     '.status = $status | .summary = $summary | .next_step = $next_step' \
     "$RESULT_FILE" >"${RESULT_FILE}.tmp"
   mv "${RESULT_FILE}.tmp" "$RESULT_FILE"
@@ -108,14 +108,14 @@ printf '%s\n' "$validation_output"
 
 if [[ "$validation_status" -ne 0 ]]; then
   status="blocked"
-  summary="${summary} Target repository validation failed."
+  summary="${summary} 目标仓库校验失败。"
   jq \
     --arg summary "$summary" \
     '.status = "blocked"
      | .summary = $summary
-     | .next_step = "Inspect and fix the target repository validation failure."
+     | .next_step = "检查并修复目标仓库的校验失败。"
      | .tests += ["validate-target.sh: failed"]
-     | .findings += ["critical: target repository static validation failed"]' \
+     | .findings += ["critical: 目标仓库静态校验失败"]' \
     "$RESULT_FILE" >"${RESULT_FILE}.tmp"
   mv "${RESULT_FILE}.tmp" "$RESULT_FILE"
   jq \
@@ -142,12 +142,12 @@ if [[ "$publish_changes" == "true" ]]; then
   if [[ -z "$pr_url" ]]; then
     pr_body="$(mktemp)"
     cat >"$pr_body" <<EOF
-Automated bounded agent cycle for issue #${ISSUE_NUMBER}.
+针对 issue #${ISSUE_NUMBER} 的自动化有界 agent 周期。
 
-Current status: **${status}**
-Current round: **${round}/${max_rounds}**
+当前状态：**${status}**
+当前轮次：**${round}/${max_rounds}**
 
-Latest summary:
+最新摘要：
 
 ${summary}
 
@@ -164,24 +164,24 @@ else
 fi
 
 comment_file="$(mktemp)"
-tests="$(jq -r 'if (.tests | length) == 0 then "- Not reported" else .tests[] | "- " + . end' "$RESULT_FILE")"
-findings="$(jq -r 'if (.findings | length) == 0 then "- None reported" else .findings[] | "- " + . end' "$RESULT_FILE")"
+tests="$(jq -r 'if (.tests | length) == 0 then "- 未报告" else .tests[] | "- " + . end' "$RESULT_FILE")"
+findings="$(jq -r 'if (.findings | length) == 0 then "- 无" else .findings[] | "- " + . end' "$RESULT_FILE")"
 next_step="$(jq -r '.next_step' "$RESULT_FILE")"
 cat >"$comment_file" <<EOF
-Agent cycle round **${round}/${max_rounds}** finished with status **${status}**.
+Agent 周期第 **${round}/${max_rounds}** 轮结束，状态：**${status}**。
 
 ${summary}
 
-Tests:
+测试：
 ${tests}
 
-Findings:
+发现：
 ${findings}
 
-Next step: ${next_step}
+下一步：${next_step}
 
-Pull request: ${pr_url}
-Run: ${run_url}
+Pull request：${pr_url}
+运行：${run_url}
 EOF
 gh issue comment "$ISSUE_NUMBER" --body-file "$comment_file" >/dev/null
 

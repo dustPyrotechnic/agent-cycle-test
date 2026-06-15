@@ -5,6 +5,12 @@ prompts define analyst, implementer, verifier, and reviewer responsibilities,
 permissions, and output contracts. `run-round.sh` appends the common prompt,
 role prompt, and only that role's relevant skills to Claude Code's system prompt.
 
+`agent-round.md` mandates Chinese for every natural-language string the agents
+emit, regardless of issue language; role prompts must not reintroduce a
+follow-the-issue-language rule. The wrapper-authored issue comments, PR body, and
+runtime summaries in `run-round.sh` / `finalize-round.sh` are likewise Chinese,
+so every reply posted to an issue is fully Chinese.
+
 The agents run in separate sessions. Their explicit handoff artifacts are:
 
 - Analyst -> `analysis.json`
