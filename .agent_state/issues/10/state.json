@@ -3,7 +3,9 @@
   "round": 1,
   "max_rounds": 5,
   "provider": "deepseek",
-  "status": "running",
+  "status": "blocked",
   "created_at": "2026-06-15T04:08:46Z",
-  "updated_at": "2026-06-15T04:08:46Z"
+  "updated_at": "2026-06-15T04:09:35Z",
+  "last_summary": "此 issue 可起卦，不可断案。\n\n以「界园」为本卦，以「第一层商店」为初爻，以「招募券」为动爻，以「出错结束」为变象。\n\n得「水雷屯」意：事起于始，未行而阻。\n\n据此象，短断一句：招募券分支在商店流程初段即逢阻滞，或状态判断未合预期，或资源未备而强行选取，然三爻虚辞、上爻未验，不敢断因。\n\n日志填 `1`，是为三爻虚辞；配置填 `1`，是为五爻失位；截图未附，是为四爻无象；report.zip 未见，是为上爻未验。无复现步骤，是为初爻不明；无系统环境，是为二爻失位。\n\n此象偏向商店流程、招募券分支、资源状态、策略判断一带。\n\n但六爻多缺，只可观象，不可断因。\n\n请补：日志、截图/录屏、配置与 report.zip。\n\n否则此卦只有天象，没有脉案。",
+  "last_run_url": "https://github.com/dustPyrotechnic/agent-cycle-test/actions/runs/27523377590"
 }
