@@ -1,0 +1,25 @@
+{
+  "status": "ready",
+  "task_type": "documentation",
+  "summary": "README.md 缺少对 insufficient_evidence 赛博算命证据闸门的说明。需要在 README.md 中新增一小节，向使用者说明：当 Issue 缺乏有效信息（无日志、截图、复现步骤、环境与版本）时，分析师会以赛博算命风格回复并要求补充材料，该轮直接结束，不产生代码改动或 PR。",
+  "evidence": [
+    "grep -ciE '算命|insufficient|无效 issue|起卦' README.md 输出 0，确认 README.md 中零提及该行为",
+    ".agent/skills/cyber-divination-debug/SKILL.md 定义了完整的证据闸门与算命回复模板",
+    ".agent/prompts/analyst-system.md 定义了 insufficient_evidence 状态与 analyst 角色在该路径下的行为",
+    "README.md 第 35–43 行为 ## 使用方法 节，第 44 行为 ## 接入目标仓库 — 两节之间是新增说明的自然插入点"
+  ],
+  "root_cause_or_rationale": "README.md 作为面向使用者的入口文档，描述了 Issue 驱动的自循环流程，但遗漏了对 insufficient_evidence 路径的说明。当使用者提交信息不足的 Issue 时，他们需要知道系统不会静默失败，而是会以赛博算命风格回复并要求补充材料，且不会产生代码改动或 PR。",
+  "implementation_plan": [
+    "在 README.md 第 43 行末尾（## 使用方法 节最后一行的 '...提供商和轮数上限。' 之后）和第 44 行（## 接入目标仓库）之间插入一个空行，然后添加新的 ## 无效 Issue 处理 小节",
+    "新小节内容：简要说明当 Issue 缺乏日志、截图、复现步骤、环境与版本等有效信息时，分析师将以赛博算命式回复要求补充材料，该轮直接结束（状态为 insufficient_evidence），不进入实施器，不产生代码改动或 Pull Request",
+    "新小节不超过 4–5 行，风格与 README 现有中文段落保持一致"
+  ],
+  "validation_plan": [
+    "grep -cE '算命|insufficient|无效 issue|起卦' README.md 应输出 ≥1（确认新增内容存在）",
+    "grep -c '## 无效 Issue 处理' README.md 应输出 1（确认新小节标题存在）",
+    "bash .agent/scripts/validate-engine.sh 应通过（确认引擎静态完整性未被破坏）"
+  ],
+  "risks": [
+    "风险极低：仅新增文档无代码逻辑变动。唯一需注意新增小节不应与已有 ## 使用方法 或 ## 自循环协议 内容产生冲突或重复表述"
+  ]
+}
