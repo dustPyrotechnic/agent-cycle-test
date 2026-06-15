@@ -61,7 +61,10 @@ status="$(jq -r '.status' "$RESULT_FILE")"
 summary="$(jq -r '.summary' "$RESULT_FILE")"
 # Rounds that produced no code change (e.g. an evidence-insufficient fake issue
 # answered by the analyst) opt out of branch and pull request publication.
-publish_changes="$(jq -r '.publish_changes // true' "$RESULT_FILE")"
+# Note: jq's `//` treats both null and false as empty, so `.publish_changes //
+# true` would wrongly yield true for an explicit false. Branch on the value
+# instead, defaulting to publishing only when the key is absent.
+publish_changes="$(jq -r 'if .publish_changes == false then "false" else "true" end' "$RESULT_FILE")"
 round="$(jq -r '.round' "$STATE_FILE")"
 max_rounds="$(jq -r '.max_rounds' "$STATE_FILE")"
 branch="agent/issue-${ISSUE_NUMBER}"

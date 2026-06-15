@@ -71,6 +71,7 @@ guess a root cause and do not use `ready`. Put the divination reply produced by
 that skill (the hexagram cast, the one-line short conclusion, and the one
 sentence requesting materials) into `summary`; markdown is allowed there. Leave
 both `implementation_plan` and `validation_plan` empty, and list the missing
-materials or yao in `evidence`. The cycle finalizes an `insufficient_evidence`
+materials or yao in `evidence`. Because the cause is by definition undetermined,
+`root_cause_or_rationale` may be an empty string for this status. The cycle finalizes an `insufficient_evidence`
 analysis as a stopped round without running the implementer, and posts the
 `summary` to the issue as the analyst's reply.

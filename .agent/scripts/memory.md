@@ -33,8 +33,11 @@
   reply posted to the issue and whose `findings` are the missing materials, and
   skips the implementer, verifier, and reviewer. It sets `publish_changes:false`
   so `finalize-round.sh` posts the comment and `agent-blocked` label but creates
-  no branch or pull request. `finalize-round.sh` reads `.publish_changes // true`;
-  every other result path keeps the default of publishing a branch and PR.
+  no branch or pull request. `finalize-round.sh` derives the flag with
+  `if .publish_changes == false then "false" else "true" end`, defaulting to
+  publish when the key is absent; it must not use jq's `//`, which treats an
+  explicit `false` as empty and would re-enable publication. Every other result
+  path keeps the default of publishing a branch and PR.
 - `validate-engine.sh`: validates the central engine repository (shell/YAML syntax, synchronized root instructions, required module memory, reusable workflow, listener template). Runs in CI; blocks engine releases.
 - `validate-target.sh`: validates the target repository after a round. Its
   current generic static check parses workflow YAML. It runs in the privileged

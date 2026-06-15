@@ -247,7 +247,7 @@ cat >"${insufficient_root}/bin/claude" <<'EOF'
 task="$(cat)"
 case "$task" in
   *"analyst phase"*)
-    printf '%s\n' '{"status":"insufficient_evidence","task_type":"bug","summary":"此问可起卦，不可断案。据此象，短断一句：卦材不足，只可观象，不可断因。请补：日志、截图、复现步骤与环境版本。","evidence":["无日志，三爻无辞","无复现，初爻不明","无环境版本，五爻无位"],"root_cause_or_rationale":"Issue carries no actionable information.","implementation_plan":[],"validation_plan":[],"risks":["证据不足，无法定位根因"]}'
+    printf '%s\n' '{"status":"insufficient_evidence","task_type":"bug","summary":"此问可起卦，不可断案。据此象，短断一句：卦材不足，只可观象，不可断因。请补：日志、截图、复现步骤与环境版本。","evidence":["无日志，三爻无辞","无复现，初爻不明","无环境版本，五爻无位"],"root_cause_or_rationale":"","implementation_plan":[],"validation_plan":[],"risks":["证据不足，无法定位根因"]}'
     ;;
   *) exit 7 ;;
 esac
@@ -261,5 +261,17 @@ test ! -e "${insufficient_root}/target/.agent_state/issues/1/implementation.json
 test ! -e "${insufficient_root}/target/.agent_state/issues/1/verification.json"
 test ! -e "${insufficient_root}/target/.agent_state/issues/1/review.json"
 test "$(git -C "${insufficient_root}/target" status --porcelain app.txt)" = ""
+
+# finalize-round.sh must read publish_changes by branching on the value, not via
+# jq's `//`, which treats an explicit false as empty and would re-enable
+# publication. Assert the exact parsing for false, true, and an absent key.
+publish_expr() {
+  jq -r 'if .publish_changes == false then "false" else "true" end'
+}
+test "$(printf '%s' '{"publish_changes":false}' | publish_expr)" = false
+test "$(printf '%s' '{"publish_changes":true}' | publish_expr)" = true
+test "$(printf '%s' '{}' | publish_expr)" = true
+grep -q 'if .publish_changes == false then "false" else "true" end' \
+  "${repo_root}/.agent/scripts/finalize-round.sh"
 
 echo "Specialized pipeline tests passed"
