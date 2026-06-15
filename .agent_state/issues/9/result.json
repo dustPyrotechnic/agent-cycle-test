@@ -1,0 +1,9 @@
+{
+  "status": "blocked",
+  "summary": "The analyst did not produce a result matching the required JSON contract.",
+  "next_step": "Inspect the workflow log and correct the analyst prompt or runtime.",
+  "tests": [],
+  "findings": [
+    "The analyst did not produce a result matching the required JSON contract."
+  ]
+}
