@@ -16,11 +16,13 @@ Manage the Agent Cycle shortcut and deploy it from any target repository.
 Usage:
   agent-cycle setup [--bin-dir DIR] [--force]
   agent-cycle deploy [shortcut options] [install.sh options]
+  agent-cycle cancel-release [TAG] --yes [--engine-repository OWNER/REPO]
   agent-cycle help
 
 Commands:
-  setup     Install this shortcut as ~/.local/bin/agent-cycle.
-  deploy    Deploy Agent Cycle from the current target repository root.
+  setup           Install this shortcut and its bundled deployer.
+  deploy          Deploy Agent Cycle from the current target repository root.
+  cancel-release  Delete a GitHub Release and its remote tag.
 
 Deploy shortcut options:
   --dev                         Use the central engine's main branch.
@@ -32,15 +34,18 @@ Deploy shortcut options:
 
 All other deploy options are forwarded to install.sh. Production deployments
 default to the private dustPyrotechnic/agent-cycle-test@v1 engine and commit the
-listener. Until v1 is published, use: agent-cycle deploy --dev
+listener.
 EOF
 }
 
 setup_shortcut() {
   local bin_dir="${AGENT_CYCLE_BIN_DIR:-${HOME}/.local/bin}"
   local force=false
+  local source_dir=""
   local source_path=""
+  local installer_source=""
   local destination=""
+  local installer_destination=""
 
   while (($#)); do
     case "$1" in
@@ -63,19 +68,36 @@ setup_shortcut() {
     esac
   done
 
-  source_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  source_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  source_path="${source_dir}/$(basename "${BASH_SOURCE[0]}")"
   destination="${bin_dir}/agent-cycle"
+  installer_destination="${bin_dir}/agent-cycle-install.sh"
+  if [[ -f "${source_dir}/install.sh" ]]; then
+    installer_source="${source_dir}/install.sh"
+  elif [[ -f "${source_dir}/agent-cycle-install.sh" ]]; then
+    installer_source="${source_dir}/agent-cycle-install.sh"
+  fi
 
   mkdir -p "$bin_dir"
   if [[ -e "$destination" ]] && ! cmp -s "$source_path" "$destination" && [[ "$force" != true ]]; then
     fail "${destination} already exists and differs; rerun setup with --force"
   fi
+  if [[ -n "$installer_source" && -e "$installer_destination" ]] &&
+    ! cmp -s "$installer_source" "$installer_destination" && [[ "$force" != true ]]; then
+    fail "${installer_destination} already exists and differs; rerun setup with --force"
+  fi
 
   if [[ "$source_path" != "$destination" ]]; then
     install -m 0755 "$source_path" "$destination"
   fi
+  if [[ -n "$installer_source" && "$installer_source" != "$installer_destination" ]]; then
+    install -m 0755 "$installer_source" "$installer_destination"
+  fi
 
   printf 'Installed Agent Cycle shortcut: %s\n' "$destination"
+  if [[ -n "$installer_source" ]]; then
+    printf 'Installed bundled deployer: %s\n' "$installer_destination"
+  fi
   case ":${PATH}:" in
     *":${bin_dir}:"*) ;;
     *)
@@ -145,10 +167,13 @@ deploy() {
   done
 
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [[ -f "${script_dir}/install.sh" ]]; then
+  if [[ -f "${script_dir}/agent-cycle-install.sh" ]]; then
+    installer="${script_dir}/agent-cycle-install.sh"
+  elif [[ -f "${script_dir}/install.sh" ]]; then
     installer="${script_dir}/install.sh"
   else
     command -v gh >/dev/null 2>&1 || fail "gh is required to download the central installer"
+    printf 'Fetching Agent Cycle installer from %s@%s...\n' "$engine_repository" "$engine_ref"
     downloaded_installer="$(mktemp)"
     trap 'rm -f "$downloaded_installer"' EXIT
     gh api \
@@ -170,11 +195,76 @@ deploy() {
     installer_args+=(--commit)
   fi
 
-  bash "$installer" "${installer_args[@]}" "${forwarded_args[@]}"
+  if ((${#forwarded_args[@]})); then
+    bash "$installer" "${installer_args[@]}" "${forwarded_args[@]}"
+  else
+    # Bash 3.2 treats an empty "${array[@]}" as unbound under set -u.
+    bash "$installer" "${installer_args[@]}"
+  fi
   if [[ -n "$downloaded_installer" ]]; then
     rm -f "$downloaded_installer"
     trap - EXIT
   fi
+}
+
+cancel_release() {
+  local engine_repository="$ENGINE_REPOSITORY"
+  local tag="v1"
+  local tag_set=false
+  local confirmed=false
+  local current_repository=""
+
+  while (($#)); do
+    case "$1" in
+      --engine-repository)
+        (($# >= 2)) || fail "--engine-repository requires a value"
+        engine_repository="$2"
+        shift 2
+        ;;
+      --yes)
+        confirmed=true
+        shift
+        ;;
+      -h | --help)
+        usage
+        return
+        ;;
+      -*)
+        fail "unknown cancel-release option: $1"
+        ;;
+      *)
+        [[ "$tag_set" != true ]] || fail "cancel-release accepts only one tag"
+        tag="$1"
+        tag_set=true
+        shift
+        ;;
+    esac
+  done
+
+  [[ "$engine_repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] ||
+    fail "invalid engine repository: ${engine_repository}"
+  [[ "$tag" =~ ^[A-Za-z0-9._/-]+$ ]] ||
+    fail "invalid release tag: ${tag}"
+  [[ "$confirmed" == true ]] ||
+    fail "cancel-release deletes ${engine_repository}@${tag}; rerun with --yes to confirm"
+
+  command -v gh >/dev/null 2>&1 || fail "gh is required to cancel a release"
+  gh release view "$tag" --repo "$engine_repository" >/dev/null ||
+    fail "GitHub Release ${engine_repository}@${tag} does not exist"
+
+  gh release delete "$tag" \
+    --repo "$engine_repository" \
+    --cleanup-tag \
+    --yes
+
+  current_repository="$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null || true)"
+  if [[ "$current_repository" == "$engine_repository" ]] &&
+    git show-ref --verify --quiet "refs/tags/${tag}"; then
+    git tag -d "$tag" >/dev/null
+    printf 'Deleted local tag: %s\n' "$tag"
+  fi
+
+  printf 'Cancelled release: %s@%s\n' "$engine_repository" "$tag"
 }
 
 command_name="${1:-help}"
@@ -188,6 +278,9 @@ case "$command_name" in
     ;;
   deploy)
     deploy "$@"
+    ;;
+  cancel-release)
+    cancel_release "$@"
     ;;
   help | -h | --help)
     usage

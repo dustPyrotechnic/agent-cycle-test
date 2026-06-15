@@ -11,6 +11,12 @@ FORCE=false
 LOCAL_ONLY=false
 COMMIT_AND_PUSH=false
 SKIP_SECRET_CHECK=false
+PROGRESS_MODE="${AGENT_PROGRESS:-auto}"
+PROGRESS_ENABLED=false
+PROGRESS_TOTAL=0
+PROGRESS_CURRENT=0
+PROGRESS_BAR_WIDTH=24
+PROGRESS_LABEL=""
 
 usage() {
   cat <<'EOF'
@@ -30,6 +36,7 @@ Options:
   --force                         Replace an existing listener workflow.
   --local-only                    Install the workflow without changing GitHub settings.
   --skip-secret-check             Do not check or prompt for required Actions secrets.
+  --no-progress                   Disable the interactive progress bar.
   -h, --help                      Show this help.
 
 The listener recognizes every issue; the optional solve-it label only re-runs an
@@ -46,7 +53,82 @@ fail() {
 }
 
 note() {
-  printf '==> %s\n' "$*"
+  printf '    %s\n' "$*"
+}
+
+setup_progress() {
+  case "$PROGRESS_MODE" in
+    auto)
+      if [[ -t 1 && "${TERM:-dumb}" != "dumb" && -z "${CI:-}" ]]; then
+        PROGRESS_ENABLED=true
+      fi
+      ;;
+    always)
+      PROGRESS_ENABLED=true
+      ;;
+    never) ;;
+    *) fail "AGENT_PROGRESS must be auto, always, or never" ;;
+  esac
+
+  if [[ "${COLUMNS:-}" =~ ^[0-9]+$ ]]; then
+    if ((COLUMNS < 60)); then
+      PROGRESS_BAR_WIDTH=12
+    elif ((COLUMNS >= 100)); then
+      PROGRESS_BAR_WIDTH=32
+    fi
+  fi
+}
+
+render_progress_bar() {
+  local completed="$1"
+  local filled=0
+  local index=0
+  local bar=""
+
+  if ((PROGRESS_TOTAL > 0)); then
+    filled=$((completed * PROGRESS_BAR_WIDTH / PROGRESS_TOTAL))
+  fi
+  while ((index < PROGRESS_BAR_WIDTH)); do
+    if ((index < filled)); then
+      bar="${bar}#"
+    else
+      bar="${bar}-"
+    fi
+    index=$((index + 1))
+  done
+  printf '[%s]' "$bar"
+}
+
+progress_start() {
+  local label="$1"
+  local next=$((PROGRESS_CURRENT + 1))
+
+  PROGRESS_LABEL="$label"
+  if [[ "$PROGRESS_ENABLED" == true ]]; then
+    if ((PROGRESS_CURRENT > 0)); then
+      printf '\n'
+    fi
+    printf '[%d/%d] %s\n' "$next" "$PROGRESS_TOTAL" "$label"
+  else
+    printf '==> [%d/%d] %s\n' "$next" "$PROGRESS_TOTAL" "$label"
+  fi
+}
+
+progress_finish() {
+  PROGRESS_CURRENT=$((PROGRESS_CURRENT + 1))
+  if [[ "$PROGRESS_ENABLED" == true ]]; then
+    render_progress_bar "$PROGRESS_CURRENT"
+    printf ' %d/%d %s\n' "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" "$PROGRESS_LABEL"
+  fi
+}
+
+run_step() {
+  local label="$1"
+  shift
+
+  progress_start "$label"
+  "$@"
+  progress_finish
 }
 
 require_command() {
@@ -197,9 +279,45 @@ install_listener() (
 )
 
 verify_engine_ref() {
+  local engine_is_private=""
+
   note "Checking engine ref ${ENGINE_REPOSITORY}@${ENGINE_REF}"
+  engine_is_private="$(gh api "repos/${ENGINE_REPOSITORY}" --jq '.private')" ||
+    fail "cannot inspect ${ENGINE_REPOSITORY}; verify repository access"
+  if [[ "$TARGET_IS_PRIVATE" != true && "$engine_is_private" == true ]]; then
+    fail "public target ${TARGET_REPOSITORY} cannot call reusable workflows from private engine ${ENGINE_REPOSITORY}; make the engine public, make the target private, or choose a public engine"
+  fi
+  if [[ "$engine_is_private" == true && "$PRIVATE_ENGINE" != true ]]; then
+    fail "private engine ${ENGINE_REPOSITORY} requires --private-engine so its code can be checked out after the reusable workflow is resolved"
+  fi
   gh api "repos/${ENGINE_REPOSITORY}/commits/${ENGINE_REF}" --silent ||
     fail "cannot access ${ENGINE_REPOSITORY}@${ENGINE_REF}; publish the ref or configure repository access"
+}
+
+inspect_target() {
+  validate_inputs
+  require_command git
+  require_command awk
+
+  TARGET_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" ||
+    fail "run this installer inside the target git repository"
+  cd "$TARGET_ROOT"
+
+  if [[ "$LOCAL_ONLY" != true ]]; then
+    require_command gh
+    require_command jq
+    gh auth status >/dev/null 2>&1 || fail "authenticate GitHub CLI first with: gh auth login"
+    read -r TARGET_REPOSITORY TARGET_PERMISSION TARGET_IS_PRIVATE < <(
+      gh repo view --json nameWithOwner,viewerPermission,isPrivate \
+        --jq '.nameWithOwner + " " + .viewerPermission + " " + (.isPrivate | tostring)'
+    )
+    [[ "$TARGET_PERMISSION" == "ADMIN" ]] ||
+      fail "admin permission is required to configure ${TARGET_REPOSITORY} (current: ${TARGET_PERMISSION})"
+    note "Target repository: ${TARGET_REPOSITORY}"
+    verify_engine_ref
+  else
+    note "Target directory: ${TARGET_ROOT}"
+  fi
 }
 
 configure_github() {
@@ -311,6 +429,10 @@ while (($#)); do
       SKIP_SECRET_CHECK=true
       shift
       ;;
+    --no-progress)
+      PROGRESS_MODE=never
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
@@ -321,43 +443,43 @@ while (($#)); do
   esac
 done
 
-validate_inputs
-require_command git
-require_command awk
-
-TARGET_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" ||
-  fail "run this installer inside the target git repository"
-cd "$TARGET_ROOT"
-
+PROGRESS_TOTAL=2
 if [[ "$LOCAL_ONLY" != true ]]; then
-  require_command gh
-  require_command jq
-  gh auth status >/dev/null 2>&1 || fail "authenticate GitHub CLI first with: gh auth login"
-  TARGET_REPOSITORY="$(gh repo view --json nameWithOwner,viewerPermission --jq '.nameWithOwner + " " + .viewerPermission')"
-  TARGET_PERMISSION="${TARGET_REPOSITORY##* }"
-  TARGET_REPOSITORY="${TARGET_REPOSITORY% *}"
-  [[ "$TARGET_PERMISSION" == "ADMIN" ]] ||
-    fail "admin permission is required to configure ${TARGET_REPOSITORY} (current: ${TARGET_PERMISSION})"
-  verify_engine_ref
+  PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
 fi
+if [[ "$COMMIT_AND_PUSH" == true ]]; then
+  PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
+fi
+setup_progress
 
-install_listener
+cat <<EOF
+
+Agent Cycle deployment
+
+  Engine: ${ENGINE_REPOSITORY}@${ENGINE_REF}
+  Provider: ${PROVIDER}
+  Trusted associations: ${TRUSTED_ASSOCIATIONS}
+
+EOF
+
+run_step "Inspect target repository" inspect_target
+run_step "Install listener workflow" install_listener
 
 if [[ "$LOCAL_ONLY" != true ]]; then
-  configure_github
+  run_step "Configure GitHub repository" configure_github
 fi
 
 if [[ "$COMMIT_AND_PUSH" == true ]]; then
-  commit_listener
+  run_step "Commit and push listener" commit_listener
 fi
 
 cat <<EOF
 
-Agent Cycle listener installed.
+Deployment complete
 
-Engine: ${ENGINE_REPOSITORY}@${ENGINE_REF}
-Workflow: ${WORKFLOW_PATH}
-Trusted associations: ${TRUSTED_ASSOCIATIONS}
+  Engine: ${ENGINE_REPOSITORY}@${ENGINE_REF}
+  Workflow: ${WORKFLOW_PATH}
+  Trusted associations: ${TRUSTED_ASSOCIATIONS}
 
 EOF
 

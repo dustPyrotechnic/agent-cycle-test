@@ -59,6 +59,9 @@ fi
 
 status="$(jq -r '.status' "$RESULT_FILE")"
 summary="$(jq -r '.summary' "$RESULT_FILE")"
+# Rounds that produced no code change (e.g. an evidence-insufficient fake issue
+# answered by the analyst) opt out of branch and pull request publication.
+publish_changes="$(jq -r '.publish_changes // true' "$RESULT_FILE")"
 round="$(jq -r '.round' "$STATE_FILE")"
 max_rounds="$(jq -r '.max_rounds' "$STATE_FILE")"
 branch="agent/issue-${ISSUE_NUMBER}"
@@ -120,21 +123,22 @@ if [[ "$validation_status" -ne 0 ]]; then
   mv "${STATE_FILE}.tmp" "$STATE_FILE"
 fi
 
-git add -A
-
-if ! git diff --cached --quiet; then
-  git commit -m "agent: issue #${ISSUE_NUMBER} round ${round} (${status})"
-fi
-git push --set-upstream origin "$branch"
-
 pr_body=""
 comment_file=""
 trap 'rm -f "$pr_body" "$comment_file"' EXIT
 
-pr_url="$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
-if [[ -z "$pr_url" ]]; then
-  pr_body="$(mktemp)"
-  cat >"$pr_body" <<EOF
+if [[ "$publish_changes" == "true" ]]; then
+  git add -A
+
+  if ! git diff --cached --quiet; then
+    git commit -m "agent: issue #${ISSUE_NUMBER} round ${round} (${status})"
+  fi
+  git push --set-upstream origin "$branch"
+
+  pr_url="$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
+  if [[ -z "$pr_url" ]]; then
+    pr_body="$(mktemp)"
+    cat >"$pr_body" <<EOF
 Automated bounded agent cycle for issue #${ISSUE_NUMBER}.
 
 Current status: **${status}**
@@ -146,11 +150,14 @@ ${summary}
 
 Closes #${ISSUE_NUMBER}
 EOF
-  pr_url="$(gh pr create \
-    --base "$default_branch" \
-    --head "$branch" \
-    --title "agent: resolve #${ISSUE_NUMBER}" \
-    --body-file "$pr_body")"
+    pr_url="$(gh pr create \
+      --base "$default_branch" \
+      --head "$branch" \
+      --title "agent: resolve #${ISSUE_NUMBER}" \
+      --body-file "$pr_body")"
+  fi
+else
+  pr_url="未创建（无效 issue，未产生代码改动）"
 fi
 
 comment_file="$(mktemp)"

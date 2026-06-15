@@ -241,4 +241,25 @@ test ! -e "${satisfied_root}/target/.agent_state/issues/1/verification.json"
 test ! -e "${satisfied_root}/target/.agent_state/issues/1/review.json"
 test "$(git -C "${satisfied_root}/target" status --porcelain app.txt)" = ""
 
+insufficient_root="$(setup_scenario insufficient-evidence)"
+cat >"${insufficient_root}/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+task="$(cat)"
+case "$task" in
+  *"analyst phase"*)
+    printf '%s\n' '{"status":"insufficient_evidence","task_type":"bug","summary":"此问可起卦，不可断案。据此象，短断一句：卦材不足，只可观象，不可断因。请补：日志、截图、复现步骤与环境版本。","evidence":["无日志，三爻无辞","无复现，初爻不明","无环境版本，五爻无位"],"root_cause_or_rationale":"Issue carries no actionable information.","implementation_plan":[],"validation_plan":[],"risks":["证据不足，无法定位根因"]}'
+    ;;
+  *) exit 7 ;;
+esac
+EOF
+chmod +x "${insufficient_root}/bin/claude"
+run_fake_round "$insufficient_root"
+test "$(jq -r '.status' "${insufficient_root}/target/.agent_state/issues/1/result.json")" = blocked
+test "$(jq -r '.publish_changes' "${insufficient_root}/target/.agent_state/issues/1/result.json")" = false
+test -s "${insufficient_root}/target/.agent_state/issues/1/analysis.json"
+test ! -e "${insufficient_root}/target/.agent_state/issues/1/implementation.json"
+test ! -e "${insufficient_root}/target/.agent_state/issues/1/verification.json"
+test ! -e "${insufficient_root}/target/.agent_state/issues/1/review.json"
+test "$(git -C "${insufficient_root}/target" status --porcelain app.txt)" = ""
+
 echo "Specialized pipeline tests passed"

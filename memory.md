@@ -8,10 +8,16 @@ The repository is a central, reusable engine for a safe-by-default, issue-driven
 
 - `.github/workflows/reusable-agent-cycle.yml` is the central engine, invoked via `workflow_call`. Target repositories install `templates/agent-cycle-listener.yml` and call it.
 - Root `install.sh` bootstraps a target repository from its working directory: it installs the listener, configures the required GitHub settings, and can commit and push only the listener file.
+- `install.sh` presents deployment as bounded progress steps. Interactive
+  terminals receive a width-adaptive ASCII progress bar; CI and redirected
+  output receive stable plain step logs. `AGENT_PROGRESS=always|auto|never`
+  controls the mode.
 - Root `agent-cycle` is a standalone convenience command. `agent-cycle setup`
-  copies it to a local bin directory; `agent-cycle deploy` downloads or invokes
-  `install.sh` and keeps that installer as the single source of deployment
-  behavior.
+  copies it and a bundled deployer to a local bin directory; `agent-cycle
+  deploy` invokes the bundled deployer when available and otherwise downloads or
+  invokes `install.sh`, keeping that installer as the single source of
+  deployment behavior. `agent-cycle cancel-release` is an explicitly confirmed
+  maintainer command that deletes a GitHub Release and its remote tag.
 - A reusable workflow runs with the CALLING repository's `github` context and `GITHUB_TOKEN`, so all issue, branch, PR, and dispatch operations act on the target repository, not the engine.
 - The runner performs two checkouts: the target repository at `TARGET_ROOT` (default workspace context) and the central engine at a sibling path. The engine `.agent` is snapshotted to `ENGINE_ROOT` out of the target tree before the model runs.
 - Each round uses a deterministic sequential pipeline: analyst -> implementer ->
@@ -27,6 +33,10 @@ The repository is a central, reusable engine for a safe-by-default, issue-driven
   successor or trust an unvalidated prior-agent artifact.
 - Trusted scripts and the prompt are read from `ENGINE_ROOT`; all git, gh, and dispatch operations run against `TARGET_ROOT`. Never address the engine repository as the target.
 - Production listeners pin the engine to a release tag or commit SHA. The engine repository must be reachable from each target (public, or same organization with workflow access).
+- A public target cannot call a reusable workflow from a private engine. The
+  installer rejects that combination before writing a listener; `ENGINE_TOKEN`
+  only authorizes the later engine checkout and cannot make the reusable
+  workflow resolvable.
 - Every issue gets an isolated branch and concurrency group.
 - A hard round limit prevents unbounded cost and recursion.
 - Only issues authored by `OWNER` are accepted by default. `AGENT_TRUSTED_ASSOCIATIONS` can explicitly broaden that list.

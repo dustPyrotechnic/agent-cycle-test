@@ -13,6 +13,8 @@ name: Agent Cycle
 #     with the default GITHUB_TOKEN (it is scoped to this repo only, even within
 #     the same organization): add an ENGINE_TOKEN secret holding a cross-repo PAT
 #     or GitHub App token and uncomment the `engine_token` line below.
+#     GitHub does not allow a PUBLIC target repository to call a reusable
+#     workflow from a PRIVATE engine at all; ENGINE_TOKEN cannot bypass that.
 #
 # Pin the engine to a release tag or commit SHA in production. Use @main only
 # while developing the engine itself.

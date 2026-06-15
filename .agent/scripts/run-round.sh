@@ -36,6 +36,7 @@ REVIEWER_SYSTEM="${ENGINE_ROOT}/prompts/reviewer-system.md"
 
 TASK_ANALYSIS_SKILL="${ENGINE_ROOT}/skills/task-analysis/SKILL.md"
 DEBUGGING_SKILL="${ENGINE_ROOT}/skills/systematic-debugging/SKILL.md"
+CYBER_DIVINATION_SKILL="${ENGINE_ROOT}/skills/cyber-divination-debug/SKILL.md"
 TEST_DRIVEN_SKILL="${ENGINE_ROOT}/skills/test-driven-change/SKILL.md"
 VERIFICATION_SKILL="${ENGINE_ROOT}/skills/regression-verification/SKILL.md"
 REVIEW_SKILL="${ENGINE_ROOT}/skills/evidence-based-review/SKILL.md"
@@ -342,8 +343,8 @@ done
 
 for source in "$ISSUE_FILE" "$STATE_FILE" "$COMMON_SYSTEM" "$ANALYST_SYSTEM" \
   "$IMPLEMENTER_SYSTEM" "$VERIFIER_SYSTEM" "$REVIEWER_SYSTEM" \
-  "$TASK_ANALYSIS_SKILL" "$DEBUGGING_SKILL" "$TEST_DRIVEN_SKILL" \
-  "$VERIFICATION_SKILL" "$REVIEW_SKILL"; do
+  "$TASK_ANALYSIS_SKILL" "$DEBUGGING_SKILL" "$CYBER_DIVINATION_SKILL" \
+  "$TEST_DRIVEN_SKILL" "$VERIFICATION_SKILL" "$REVIEW_SKILL"; do
   require_file "$source"
 done
 
@@ -396,7 +397,8 @@ IMPLEMENTER_COMBINED_SYSTEM="${TEMP_DIR}/implementer-system.md"
 VERIFIER_COMBINED_SYSTEM="${TEMP_DIR}/verifier-system.md"
 REVIEWER_COMBINED_SYSTEM="${TEMP_DIR}/reviewer-system.md"
 build_system_prompt "$ANALYST_COMBINED_SYSTEM" \
-  "$COMMON_SYSTEM" "$ANALYST_SYSTEM" "$TASK_ANALYSIS_SKILL" "$DEBUGGING_SKILL"
+  "$COMMON_SYSTEM" "$ANALYST_SYSTEM" "$TASK_ANALYSIS_SKILL" "$DEBUGGING_SKILL" \
+  "$CYBER_DIVINATION_SKILL"
 build_system_prompt "$IMPLEMENTER_COMBINED_SYSTEM" \
   "$COMMON_SYSTEM" "$IMPLEMENTER_SYSTEM" "$TEST_DRIVEN_SKILL"
 build_system_prompt "$VERIFIER_COMBINED_SYSTEM" \
@@ -438,7 +440,8 @@ fi
 
 normalize_agent_json "$ANALYST_OUTPUT"
 if ! jq -e '
-  (.status == "ready" or .status == "satisfied" or .status == "blocked")
+  (.status == "ready" or .status == "satisfied" or .status == "blocked"
+    or .status == "insufficient_evidence")
   and (.task_type == "bug" or .task_type == "feature" or .task_type == "refactor"
     or .task_type == "documentation" or .task_type == "build_ci" or .task_type == "mixed")
   and (.summary | type == "string" and length > 0)
@@ -454,6 +457,7 @@ if ! jq -e '
   and (.status != "ready" or (.implementation_plan | length) > 0)
   and (.status != "ready" or (.validation_plan | length) > 0)
   and (.status != "satisfied" or (.validation_plan | length) > 0)
+  and (.status != "insufficient_evidence" or (.implementation_plan | length) == 0)
 ' "$ANALYST_OUTPUT" >/dev/null 2>&1; then
   write_runtime_result blocked \
     "The analyst did not produce a result matching the required JSON contract." \
@@ -485,6 +489,28 @@ if [[ "$(jq -r '.status' "$ANALYSIS_FILE")" == "satisfied" ]]; then
     printf 'Status: complete\n\n'
     printf '%s\n\n' "$(jq -r '.summary' "$ANALYSIS_FILE")"
     printf 'Next step: No code change was required; the requested outcome was already satisfied.\n'
+  } >"$HANDOFF_FILE"
+  finish_round
+fi
+
+if [[ "$(jq -r '.status' "$ANALYSIS_FILE")" == "insufficient_evidence" ]]; then
+  # The issue carries no actionable information, so the analyst replied through
+  # the cyber-divination evidence gate instead of guessing a fix. Post that
+  # hexagram reply to the issue and stop the round before the implementer; do
+  # not create a branch or pull request for a fake or empty issue.
+  jq '{
+    status: "blocked",
+    summary: .summary,
+    next_step: "补充日志、截图/录屏、复现步骤、环境与版本后，重新添加 solve-it 触发分析。",
+    tests: [],
+    findings: .evidence,
+    publish_changes: false
+  }' "$ANALYSIS_FILE" >"$RESULT_FILE"
+  {
+    printf '# Handoff\n\n'
+    printf 'Status: blocked (insufficient evidence)\n\n'
+    jq -r '.summary' "$ANALYSIS_FILE"
+    printf '\n'
   } >"$HANDOFF_FILE"
   finish_round
 fi

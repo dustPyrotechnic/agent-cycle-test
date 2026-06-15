@@ -6,7 +6,7 @@ the target repository or the temporary Claude home.
 
 ## Role Mapping
 
-- Analyst: `task-analysis` and `systematic-debugging`.
+- Analyst: `task-analysis`, `systematic-debugging`, and `cyber-divination-debug`.
 - Implementer: `test-driven-change`.
 - Verifier: `regression-verification`.
 - Reviewer: `evidence-based-review`.
@@ -24,7 +24,11 @@ the target repository or the temporary Claude home.
 - `github/awesome-copilot` (MIT): specialized debug, implementation, QA, and
   review agent role definitions.
 
-The repository skills are original compact adaptations for this engine. Keep
+`cyber-divination-debug` is vendored from the external repository
+`dustPyrotechnic/cyber-divination-debug`; it is an evidence-gate skill (request
+missing diagnostic materials before guessing) loaded only for the analyst.
+
+The other repository skills are original compact adaptations for this engine. Keep
 them deterministic, role-specific, and small enough to append to the trusted
 system prompt every round. Every role returns a Shell-validated JSON artifact;
 do not rely on free-form conversation history for role handoff.

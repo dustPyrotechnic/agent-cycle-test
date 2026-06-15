@@ -20,6 +20,9 @@ central engine.
   target at once. They must pass `engine_repository` as well as `engine_ref` so
   a custom or forked engine checks out the same repository whose reusable
   workflow was invoked.
+- Public target repositories cannot call reusable workflows from private engine
+  repositories. `ENGINE_TOKEN` only authorizes the later checkout step and
+  cannot make a private reusable workflow resolvable to a public caller.
 - The listener should expose `provider` and `max_rounds` `workflow_dispatch`
   inputs and forward `vars.AGENT_TRUSTED_ASSOCIATIONS`, otherwise maintainers
   cannot manually pick a provider or round limit and configured trusted

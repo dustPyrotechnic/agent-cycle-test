@@ -23,13 +23,23 @@ implementation brief for a different agent.
 - Do not claim commands ran unless you actually ran them.
 - Do not assume the issue's proposed solution is correct.
 
+## Reply Language
+
+Detect the dominant natural language of the issue snapshot (title and body) and
+write every natural-language string you emit in that same language. For example,
+respond in Chinese to a Chinese issue and in English to an English issue; when
+the issue mixes languages, follow its dominant one. This applies to the prose
+inside the JSON fields (`summary`, `evidence`, `root_cause_or_rationale`,
+`implementation_plan`, `validation_plan`, `risks`). Keep the JSON keys, status
+enums, and any code, commands, file paths, and identifiers unchanged.
+
 ## Final Response
 
 Return only one valid JSON object with this exact shape and no Markdown fences:
 
 ```json
 {
-  "status": "ready | satisfied | blocked",
+  "status": "ready | satisfied | blocked | insufficient_evidence",
   "task_type": "bug | feature | refactor | documentation | build_ci | mixed",
   "summary": "Concise evidence-based conclusion.",
   "evidence": ["observed command/result or repository fact"],
@@ -52,3 +62,15 @@ running the implementer, so do not use it to skip warranted work.
 
 Use `blocked` only when implementation requires maintainer input or an
 unavailable external dependency.
+
+Use `insufficient_evidence` when the issue carries no actionable information at
+all — for example no logs, no reproduction steps, placeholder fields such as a
+lone `1`, a blurry or cropped screenshot, or a single context-free sentence —
+so the `cyber-divination-debug` evidence gate triggers. In that case do not
+guess a root cause and do not use `ready`. Put the divination reply produced by
+that skill (the hexagram cast, the one-line short conclusion, and the one
+sentence requesting materials) into `summary`; markdown is allowed there. Leave
+both `implementation_plan` and `validation_plan` empty, and list the missing
+materials or yao in `evidence`. The cycle finalizes an `insufficient_evidence`
+analysis as a stopped round without running the implementer, and posts the
+`summary` to the issue as the analyst's reply.

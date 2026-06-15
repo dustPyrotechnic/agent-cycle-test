@@ -52,15 +52,11 @@
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-之后进入任意目标项目根目录即可部署。当前中央引擎尚未发布 `v1`
-标签，开发期间使用：
+`setup` 会同时安装快捷命令和配套部署器；这样本机部署使用当前已验证的
+安装界面，配套部署器不可用时才从中央仓库下载。
 
-```bash
-cd /path/to/target-repository
-agent-cycle deploy --dev
-```
-
-发布稳定 `v1` 标签后，生产项目直接执行：
+当前私有引擎可部署到任意私有目标项目；进入项目根目录后通过稳定 `v1`
+部署：
 
 ```bash
 cd /path/to/target-repository
@@ -72,22 +68,45 @@ agent-cycle deploy
 
 ```bash
 # 不自动提交监听器
-agent-cycle deploy --dev --no-commit
+agent-cycle deploy --no-commit
 
 # 使用 MiMo，并允许 OWNER 和 MEMBER 创建任务
-agent-cycle deploy --dev --provider mimo --trusted-associations OWNER,MEMBER
+agent-cycle deploy --provider mimo --trusted-associations OWNER,MEMBER
 
 # 更新已安装的本机快捷命令
 ./agent-cycle setup --force
 ```
 
 如果 `~/.local/bin` 尚未加入 shell 的 `PATH`，请把上述 `export` 写入
-`~/.zshrc`。生产环境应使用稳定 tag 或 commit SHA，不要长期使用
-`--dev`。
+`~/.zshrc`。`--dev` 仅用于显式测试中央引擎的 `main` 分支。
+
+部署时，交互式终端会显示按终端宽度适配的进度条；CI、管道和重定向
+输出会自动使用稳定的分步日志。可以通过环境变量或参数控制：
+
+```bash
+# 强制显示进度条
+AGENT_PROGRESS=always agent-cycle deploy
+
+# 禁用进度条
+agent-cycle deploy --no-progress
+```
+
+### 撤销发布
+
+撤销版本会删除 GitHub Release 和远端标签。该操作具有破坏性，必须
+显式传入 `--yes`：
+
+```bash
+agent-cycle cancel-release v1 --yes
+```
+
+如果命令在中央引擎仓库目录中运行，还会删除同名本地标签。撤销 `v1`
+后，引用 `@v1` 的目标仓库将无法运行，必须先发布替代版本或临时改用
+`agent-cycle deploy --dev`。
 
 ### 单次远程安装
 
-当前中央引擎是私有仓库。发布稳定的 `v1` tag 后，在任意目标仓库目录运行以下一条认证命令，即可完成监听器安装、GitHub 仓库设置、`solve-it` 标签、可信作者变量和模型 Secret 检查，并只提交、推送监听器文件：
+当前中央引擎是私有仓库。发布稳定的 `v1` tag 后，在任意**私有**目标仓库目录运行以下一条认证命令，即可完成监听器安装、GitHub 仓库设置、`solve-it` 标签、可信作者变量和模型 Secret 检查，并只提交、推送监听器文件：
 
 ```bash
 bash <(gh api --method GET -H 'Accept: application/vnd.github.raw+json' repos/dustPyrotechnic/agent-cycle-test/contents/install.sh -f ref=v1) --private-engine --commit
@@ -117,7 +136,7 @@ bash /path/to/agent-cycle-test/install.sh --provider mimo --trusted-associations
 bash /path/to/agent-cycle-test/install.sh --private-engine --commit
 ```
 
-私有中央引擎还必须在自身 Actions 设置中允许目标仓库调用 reusable workflow；`ENGINE_TOKEN` 需要是能够读取中央引擎的跨仓库 PAT 或 GitHub App token。
+私有中央引擎还必须在自身 Actions 设置中允许目标仓库调用 reusable workflow；`ENGINE_TOKEN` 需要是能够读取中央引擎的跨仓库 PAT 或 GitHub App token。GitHub 不允许 public 目标仓库调用 private reusable workflow；这类目标必须改用 public 引擎，或先转为 private。`ENGINE_TOKEN` 只影响 workflow 解析后的 checkout，不能绕过该限制。
 
 不使用安装器时，仍可手动复制 `templates/agent-cycle-listener.yml` 到目标仓库的 `.github/workflows/agent-cycle.yml`，并完成相同的仓库设置。生产监听器必须固定到稳定 tag 或 commit SHA；`uses:`、`engine_repository` 与 `engine_ref` 必须指向同一个引擎版本来源。
 
