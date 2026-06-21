@@ -1,0 +1,16 @@
+{
+  "status": "complete",
+  "summary": "评审通过。README.md 新增「无效 Issue 处理」小节（+4 行），准确说明 insufficient_evidence 赛博算命证据闸门行为：信息不足的 Issue 以算命式回复要求补充日志、截图、复现步骤、环境与版本，状态标记为 insufficient_evidence，不进入实施器，不产生代码改动或 PR。仅修改 README.md，无其他文件变动。三项独立验证（关键词 grep、标题 grep、validate-engine.sh）全部通过。变更完全符合 Issue #24 的验收要求，无偏差、无阻塞性问题。",
+  "next_step": "包装器可将状态更新为 complete，将 README.md 变更合并入主分支。",
+  "tests": [
+    "grep -cE '算命|insufficient|无效 issue|起卦' README.md: 输出 1",
+    "grep -c '## 无效 Issue 处理' README.md: 输出 1",
+    "bash .agent/scripts/validate-engine.sh: 三项测试全部通过",
+    "git diff --stat: 仅 README.md 被修改，+4 行"
+  ],
+  "findings": [
+    "info: 新小节位置完全符合 analyst 计划（第 43 行「使用方法」末尾与第 48 行「接入目标仓库」之间），无冲突、无冗余",
+    "info: 新增内容风格与 README 现有中文段落一致，长度适中（4 行），涵盖 Issue 中要求的所有要点",
+    "info: 验证器证据时效有效 — 独立重新运行所有检查后结果与 verifier 报告一致"
+  ]
+}

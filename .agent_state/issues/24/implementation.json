@@ -1,0 +1,12 @@
+{
+  "status": "ready_for_verification",
+  "summary": "在 README.md 的「使用方法」与「接入目标仓库」之间新增「无效 Issue 处理」小节，向使用者说明 insufficient_evidence 赛博算命证据闸门的行为：信息不足的 Issue 将以算命式回复要求补充材料，不进入实施器、不产生代码改动或 PR。",
+  "changes": ["README.md: 新增 ## 无效 Issue 处理 小节（第44-46行），说明 insufficient_evidence 算命闸门行为"],
+  "tests": [
+    "grep -cE '算命|insufficient|无效 issue|起卦' README.md: 输出 1（通过，新增内容包含关键词）",
+    "grep -c '## 无效 Issue 处理' README.md: 输出 1（通过，新小节标题存在且唯一）",
+    "bash .agent/scripts/validate-engine.sh: 三项测试全部通过（Specialized pipeline tests passed / Installer tests passed / Central engine configuration is valid）"
+  ],
+  "deviations": [],
+  "remaining_concerns": []
+}
