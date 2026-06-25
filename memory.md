@@ -16,8 +16,10 @@ The repository is a central, reusable engine for a safe-by-default, issue-driven
   copies it and a bundled deployer to a local bin directory; `agent-cycle
   deploy` invokes the bundled deployer when available and otherwise downloads or
   invokes `install.sh`, keeping that installer as the single source of
-  deployment behavior. `agent-cycle cancel-release` is an explicitly confirmed
-  maintainer command that deletes a GitHub Release and its remote tag.
+  deployment behavior. `agent-cycle benchmark` drives provider evaluation from
+  pinned open-source task definitions without changing the core round loop.
+  `agent-cycle cancel-release` is an explicitly confirmed maintainer command
+  that deletes a GitHub Release and its remote tag.
 - A reusable workflow runs with the CALLING repository's `github` context and `GITHUB_TOKEN`, so all issue, branch, PR, and dispatch operations act on the target repository, not the engine.
 - The runner performs two checkouts: the target repository at `TARGET_ROOT` (default workspace context) and the central engine at a sibling path. The engine `.agent` is snapshotted to `ENGINE_ROOT` out of the target tree before the model runs.
 - Each round uses a deterministic sequential pipeline: analyst -> implementer ->

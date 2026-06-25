@@ -29,6 +29,8 @@ make_target "$default_target"
 )
 default_listener="${default_target}/.github/workflows/agent-cycle.yml"
 assert_contains "    types: [opened, reopened, edited, labeled]" "$default_listener"
+assert_contains "        !contains(github.event.issue.labels.*.name, 'agent-benchmark') &&" "$default_listener"
+assert_contains "      base_ref: \${{ github.event.client_payload.base_ref || inputs.base_ref || '' }}" "$default_listener"
 assert_contains "    uses: dustPyrotechnic/agent-cycle-test/.github/workflows/reusable-agent-cycle.yml@v1" "$default_listener"
 assert_contains "      engine_repository: dustPyrotechnic/agent-cycle-test" "$default_listener"
 assert_contains "      engine_ref: v1" "$default_listener"

@@ -209,6 +209,7 @@ TARGET_ROOT=/path/to/target bash .agent/scripts/validate-target.sh
 
 - 根级执行规则：`CLAUDE.md`、`AGENTS.md`
 - 架构决策：`memory.md`
+- 开源项目评测：`docs/benchmarking.md`
 - Agent 运行时：`.agent/memory.md`
 - GitHub 编排：`.github/memory.md`
 - 目标仓库监听器模板：`templates/memory.md`

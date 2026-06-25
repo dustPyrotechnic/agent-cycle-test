@@ -15,6 +15,10 @@ central engine.
   the central `reusable-agent-cycle.yml`. It must declare `contents`, `issues`, and
   `pull-requests` write permissions and pass model secrets explicitly; reusable
   workflows do not inherit caller secrets without an explicit `secrets:` block.
+  Issues labeled `agent-benchmark` are ignored on normal issue events so
+  benchmark issue creation does not auto-start a default-provider run; benchmark
+  jobs run through `workflow_dispatch` with explicit provider, rounds,
+  `base_ref`, and resolved `base_sha`.
 - Production listeners must pin the engine to a release tag or commit SHA. `@main`
   is for engine development only, because central `main` changes reach every
   target at once. They must pass `engine_repository` as well as `engine_ref` so
@@ -23,10 +27,10 @@ central engine.
 - Public target repositories cannot call reusable workflows from private engine
   repositories. `ENGINE_TOKEN` only authorizes the later checkout step and
   cannot make a private reusable workflow resolvable to a public caller.
-- The listener should expose `provider` and `max_rounds` `workflow_dispatch`
+- The listener should expose `provider`, `max_rounds`, `base_ref`, and `base_sha` `workflow_dispatch`
   inputs and forward `vars.AGENT_TRUSTED_ASSOCIATIONS`, otherwise maintainers
-  cannot manually pick a provider or round limit and configured trusted
-  associations are silently ignored.
+  cannot manually pick a provider, round limit, or task branch base and
+  configured trusted associations are silently ignored.
 
 Post-round validation (`validate-target.sh`) runs in the privileged finalize
 context, so it performs only static checks and never executes target-controlled

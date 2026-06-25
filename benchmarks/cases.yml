@@ -1,0 +1,49 @@
+cases:
+  - id: docs-readme-install
+    title: Document local installation verification
+    source_repository: psf/requests
+    source_commit: d64b9ad4bf1c14e21e0df3f0f4320fec81180e91
+    target_ref: benchmark/docs-readme-install
+    # For a controlled fork, add:
+    # target_repository: OWNER/requests-benchmark
+    task_type: documentation
+    max_rounds: 3
+    issue_body: |
+      Update the project documentation so a new contributor can verify a local
+      installation without guessing which command to run. Keep the change small
+      and do not modify runtime code.
+    validation_commands:
+      - git diff --check
+      - grep -R "pip install" README* docs || true
+
+  - id: js-test-message
+    title: Improve a failing test message
+    source_repository: sindresorhus/type-fest
+    source_commit: 8e5c69af9a18b1abb1047037a9cde3a103121dcb
+    target_ref: benchmark/js-test-message
+    # For a controlled fork, add:
+    # target_repository: OWNER/type-fest-benchmark
+    task_type: test
+    max_rounds: 3
+    issue_body: |
+      Improve one unclear test assertion message around type expectation
+      failures. Keep behavior unchanged and validate with the relevant test or
+      typecheck command available in the repository.
+    validation_commands:
+      - npm test
+
+  - id: cli-ci-docs
+    title: Clarify CI troubleshooting for contributors
+    source_repository: pallets/click
+    source_commit: 8a1b1a33d739be05b7e91251e3c0dde77c5e152f
+    target_ref: benchmark/cli-ci-docs
+    # For a controlled fork, add:
+    # target_repository: OWNER/click-benchmark
+    task_type: documentation
+    max_rounds: 3
+    issue_body: |
+      Add a concise contributor-facing note explaining how to reproduce a common
+      CI failure locally. Prefer existing contributor documentation and avoid
+      changing package behavior.
+    validation_commands:
+      - git diff --check

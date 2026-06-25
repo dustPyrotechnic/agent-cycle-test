@@ -20,6 +20,16 @@ on:
         required: false
         default: "5"
         type: string
+      base_ref:
+        description: Optional base ref for the agent task branch. Defaults to the target default branch.
+        required: false
+        default: ""
+        type: string
+      base_sha:
+        description: Optional resolved base commit for the agent task branch.
+        required: false
+        default: ""
+        type: string
       trusted_associations:
         required: false
         default: OWNER
@@ -64,6 +74,8 @@ jobs:
       ISSUE_NUMBER: ${{ inputs.issue_number }}
       AGENT_PROVIDER: ${{ inputs.provider }}
       MAX_ROUNDS: ${{ inputs.max_rounds }}
+      AGENT_BASE_REF: ${{ inputs.base_ref }}
+      AGENT_BASE_SHA: ${{ inputs.base_sha }}
       AGENT_ANALYSIS_TIMEOUT_MINUTES: "10"
       AGENT_IMPLEMENTATION_TIMEOUT_MINUTES: "35"
       AGENT_VERIFICATION_TIMEOUT_MINUTES: "10"

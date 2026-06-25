@@ -1,0 +1,14 @@
+weights:
+  completion: 50
+  rounds: 15
+  change_quality: 15
+  verification: 10
+  stability: 10
+
+round_penalty: 5
+
+finding_penalties:
+  critical: 15
+  high: 10
+  medium: 5
+  low: 2

@@ -14,28 +14,31 @@ STATE_DIR=".agent_state/issues/${ISSUE_NUMBER}"
 RESULT_FILE="${STATE_DIR}/result.json"
 STATE_FILE="${STATE_DIR}/state.json"
 AGENT_PROVIDER="${AGENT_PROVIDER:-deepseek}"
+AGENT_BASE_REF="${AGENT_BASE_REF:-}"
+AGENT_BASE_SHA="${AGENT_BASE_SHA:-}"
+gh_bin="${GH_BIN:-gh}"
 
 if [[ -f "${ENGINE_ROOT}/credential-leak-detected" ]]; then
-  gh issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：工作树中出现了配置的模型凭据。未提交或推送任何 agent 改动。请轮换受影响的凭据，并在重试前检查失败的运行。" >/dev/null
-  gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
-  gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
-  gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
+  "$gh_bin" issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：工作树中出现了配置的模型凭据。未提交或推送任何 agent 改动。请轮换受影响的凭据，并在重试前检查失败的运行。" >/dev/null
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
   exit 1
 fi
 
 if [[ -f "${ENGINE_ROOT}/readonly-phase-mutation-detected" ]]; then
-  gh issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：只读的分析师、验证者或复审者修改了目标工作树。未提交或推送任何 agent 改动。请在重试前检查失败的运行与角色提示词。" >/dev/null
-  gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
-  gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
-  gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
+  "$gh_bin" issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：只读的分析师、验证者或复审者修改了目标工作树。未提交或推送任何 agent 改动。请在重试前检查失败的运行与角色提示词。" >/dev/null
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
   exit 1
 fi
 
 if [[ -f "${ENGINE_ROOT}/protected-state-mutation-detected" ]]; then
-  gh issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：实施者修改了 wrapper 所有的 .agent_state/issues 内容。未提交或推送任何 agent 改动。请在重试前检查失败的运行与角色提示词。" >/dev/null
-  gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
-  gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
-  gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
+  "$gh_bin" issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：实施者修改了 wrapper 所有的 .agent_state/issues 内容。未提交或推送任何 agent 改动。请在重试前检查失败的运行与角色提示词。" >/dev/null
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
+  "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
   exit 1
 fi
 
@@ -65,10 +68,13 @@ summary="$(jq -r '.summary' "$RESULT_FILE")"
 # true` would wrongly yield true for an explicit false. Branch on the value
 # instead, defaulting to publishing only when the key is absent.
 publish_changes="$(jq -r 'if .publish_changes == false then "false" else "true" end' "$RESULT_FILE")"
+publish_state_changes=false
 round="$(jq -r '.round' "$STATE_FILE")"
 max_rounds="$(jq -r '.max_rounds' "$STATE_FILE")"
 branch="agent/issue-${ISSUE_NUMBER}"
-default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
+default_branch="$("$gh_bin" api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
+pr_base_ref="$(jq -r --arg fallback "${AGENT_BASE_REF:-$default_branch}" '.base_ref // $fallback' "$STATE_FILE")"
+pr_base_sha="$(jq -r --arg fallback "$AGENT_BASE_SHA" '.base_sha // $fallback' "$STATE_FILE")"
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 run_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID:-unknown}"
 
@@ -126,6 +132,30 @@ if [[ "$validation_status" -ne 0 ]]; then
   mv "${STATE_FILE}.tmp" "$STATE_FILE"
 fi
 
+if [[ -n "$pr_base_sha" ]]; then
+  current_pr_base_sha="$("$gh_bin" api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${pr_base_ref}" --jq '.object.sha' 2>/dev/null || true)"
+  if [[ -n "$current_pr_base_sha" && "$current_pr_base_sha" != "$pr_base_sha" ]]; then
+    status="blocked"
+    publish_changes="false"
+    publish_state_changes=true
+    summary="${summary} Benchmark base ref ${pr_base_ref} moved from ${pr_base_sha} to ${current_pr_base_sha:-unavailable}."
+    jq \
+      --arg summary "$summary" \
+      --arg finding "critical: benchmark base ref ${pr_base_ref} moved from ${pr_base_sha} to ${current_pr_base_sha:-unavailable}" \
+      '.status = "blocked"
+       | .summary = $summary
+       | .next_step = "Reset the benchmark target ref to the recorded base SHA or create a fresh benchmark issue."
+       | .findings += [$finding]' \
+      "$RESULT_FILE" >"${RESULT_FILE}.tmp"
+    mv "${RESULT_FILE}.tmp" "$RESULT_FILE"
+    jq \
+      --arg summary "$summary" \
+      '.status = "blocked" | .last_summary = $summary' \
+      "$STATE_FILE" >"${STATE_FILE}.tmp"
+    mv "${STATE_FILE}.tmp" "$STATE_FILE"
+  fi
+fi
+
 pr_body=""
 comment_file=""
 trap 'rm -f "$pr_body" "$comment_file"' EXIT
@@ -138,7 +168,7 @@ if [[ "$publish_changes" == "true" ]]; then
   fi
   git push --set-upstream origin "$branch"
 
-  pr_url="$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
+  pr_url="$("$gh_bin" pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
   if [[ -z "$pr_url" ]]; then
     pr_body="$(mktemp)"
     cat >"$pr_body" <<EOF
@@ -153,14 +183,23 @@ ${summary}
 
 Closes #${ISSUE_NUMBER}
 EOF
-    pr_url="$(gh pr create \
-      --base "$default_branch" \
+    pr_url="$("$gh_bin" pr create \
+      --base "$pr_base_ref" \
       --head "$branch" \
       --title "agent: resolve #${ISSUE_NUMBER}" \
       --body-file "$pr_body")"
   fi
 else
-  pr_url="未创建（无效 issue，未产生代码改动）"
+  if [[ "$publish_state_changes" == "true" ]]; then
+    git add "$STATE_DIR"
+    if ! git diff --cached --quiet; then
+      git commit -m "agent: issue #${ISSUE_NUMBER} round ${round} (${status})"
+      git push --set-upstream origin "$branch"
+    fi
+    pr_url="未创建（benchmark base 已移动，未创建 PR）"
+  else
+    pr_url="未创建（无效 issue，未产生代码改动）"
+  fi
 fi
 
 comment_file="$(mktemp)"
@@ -183,25 +222,27 @@ ${findings}
 Pull request：${pr_url}
 运行：${run_url}
 EOF
-gh issue comment "$ISSUE_NUMBER" --body-file "$comment_file" >/dev/null
+"$gh_bin" issue comment "$ISSUE_NUMBER" --body-file "$comment_file" >/dev/null
 
 case "$status" in
   complete)
-    gh issue edit "$ISSUE_NUMBER" --add-label agent-done >/dev/null
-    gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
-    gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
+    "$gh_bin" issue edit "$ISSUE_NUMBER" --add-label agent-done >/dev/null
+    "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
+    "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
     ;;
   blocked)
-    gh issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
-    gh issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
-    gh issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
+    "$gh_bin" issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null
+    "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label solve-it >/dev/null 2>&1 || true
+    "$gh_bin" issue edit "$ISSUE_NUMBER" --remove-label agent-running >/dev/null 2>&1 || true
     ;;
   continue)
-    gh api "repos/${GITHUB_REPOSITORY}/dispatches" \
+    "$gh_bin" api "repos/${GITHUB_REPOSITORY}/dispatches" \
       -f event_type=agent-relay \
       -F "client_payload[issue_number]=${ISSUE_NUMBER}" \
       -F "client_payload[max_rounds]=${max_rounds}" \
-      -f "client_payload[provider]=${AGENT_PROVIDER}"
+      -f "client_payload[provider]=${AGENT_PROVIDER}" \
+      -f "client_payload[base_ref]=${pr_base_ref}" \
+      -f "client_payload[base_sha]=${pr_base_sha}"
     ;;
 esac
 

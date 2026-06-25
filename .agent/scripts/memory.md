@@ -3,11 +3,16 @@
 ## Script Responsibilities
 
 - `prepare-round.sh`: validates the trusted issue, checks out the task branch, increments persisted state, and marks the issue running.
+  When `AGENT_BASE_SHA` is set, the first task branch is created from that
+  resolved commit instead of the target default branch; `AGENT_BASE_REF` remains
+  the human branch name and PR base. Existing task branches still resume from
+  `origin/agent/issue-<n>`.
 - `run-round.sh`: configures the selected provider and invokes four independent
   specialized Claude Code sessions in order: analyst, implementer, verifier,
   reviewer. It validates and persists each handoff artifact before starting the
   next role.
 - `finalize-round.sh`: validates the result, commits and pushes changes, updates the PR and issue, and optionally dispatches the next round.
+  Relay dispatches preserve `base_ref` and `base_sha` for benchmark runs.
 
 ### Agent output parsing (`run-round.sh`)
 
@@ -60,6 +65,20 @@
   for private engines, rejection of public-target/private-engine reusable
   workflow deployments, confirmed release cancellation, and refusal to
   overwrite an existing listener without `--force`.
+- `benchmark.sh`: drives provider evaluation outside the core round loop. It
+  validates benchmark YAML, creates one issue per case/provider pair, triggers
+  `agent-cycle.yml` manually with the provider and round limit, collects compact
+  state/result/verification/PR metadata from task branches, and renders a
+  Markdown score report. It never runs model code itself.
+- `test-benchmark.sh`: verifies benchmark configuration parsing and Markdown
+  report scoring with offline fixtures; it does not call GitHub or providers.
+- `test-prepare-round.sh`: verifies `prepare-round.sh` creates a first
+  `agent/issue-<n>` branch from `AGENT_BASE_REF` when supplied, preserving the
+  benchmark base ref instead of defaulting to the repository default branch, and
+  that later rounds resume from the existing task branch without refetching a
+  now-missing benchmark base.
+- `test-finalize-round.sh`: verifies `finalize-round.sh` opens PRs against the
+  persisted `base_ref` rather than the repository default branch.
 
 ## Engine and Target Roots
 

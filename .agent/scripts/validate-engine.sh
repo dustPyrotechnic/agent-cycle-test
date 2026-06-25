@@ -31,7 +31,11 @@ required_files=(
   .agent/prompts/verifier-system.md
   .agent/prompts/reviewer-system.md
   .agent/scripts/memory.md
+  .agent/scripts/benchmark.sh
+  .agent/scripts/test-prepare-round.sh
+  .agent/scripts/test-finalize-round.sh
   .agent/scripts/test-installer.sh
+  .agent/scripts/test-benchmark.sh
   .agent/scripts/test-specialized-pipeline.sh
   .agent/skills/memory.md
   .agent/skills/task-analysis/SKILL.md
@@ -46,6 +50,10 @@ required_files=(
   templates/memory.md
   install.sh
   agent-cycle
+  benchmarks/cases.yml
+  benchmarks/providers.yml
+  benchmarks/rubric.yml
+  docs/benchmarking.md
   .github/workflows/reusable-agent-cycle.yml
   templates/agent-cycle-listener.yml
 )
@@ -74,6 +82,9 @@ ruby -e '
 '
 
 bash .agent/scripts/test-specialized-pipeline.sh
+bash .agent/scripts/test-prepare-round.sh
+bash .agent/scripts/test-finalize-round.sh
 bash .agent/scripts/test-installer.sh
+bash .agent/scripts/test-benchmark.sh
 
 echo "Central engine configuration is valid"

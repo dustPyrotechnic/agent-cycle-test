@@ -8,24 +8,33 @@
 - Runs prepare, run, and finalize from the engine snapshot against the target tree.
 - Gives one bounded round enough time for four sequential specialized sessions:
   analyst, implementer, verifier, and reviewer. Each phase has its own timeout.
+- Accepts optional `base_ref` and `base_sha`; `prepare-round.sh` uses `base_sha`
+  only when first creating the per-issue agent branch, while `base_ref` remains
+  the PR base branch. Benchmark runs therefore start from a resolved commit
+  without losing the branch needed for review.
 
 The engine ref problem: a reusable workflow has NO caller-independent way to learn its own ref. `github.workflow_ref` resolves to the caller's listener (the `github` context belongs to the caller), and `github.job_workflow_ref`/`job_workflow_sha` are not real `github` context properties. Therefore the caller passes `engine_repository` and `engine_ref`, keeping them in sync with the repository and `@ref` pinned in its `uses:` line. Empty `engine_ref` defaults to `$GITHUB_SHA`, which is correct only for the engine's own self-listener (local `./` call).
 
 Two more constraints apply:
 
 - The `runner` context (e.g. `runner.temp`) is unavailable in job-level `env:`. Export `ENGINE_ROOT`/`TARGET_ROOT` from a step using the `$RUNNER_TEMP`/`$GITHUB_WORKSPACE` shell variables into `$GITHUB_ENV`.
-- Listeners must forward `vars.AGENT_TRUSTED_ASSOCIATIONS` and expose `provider`/`max_rounds` `workflow_dispatch` inputs, or those documented capabilities silently fall back to defaults.
+- Listeners must forward `vars.AGENT_TRUSTED_ASSOCIATIONS` and expose
+  `provider`/`max_rounds`/`base_ref`/`base_sha` `workflow_dispatch` inputs, or those
+  documented capabilities silently fall back to defaults.
 
 ## Agent Cycle (central self-listener)
 
 `agent-cycle.yml` is the central repository's own listener. It calls `reusable-agent-cycle.yml` via a local `./` reference so the engine exercises the same production path as targets. It runs for:
 
-- Any issue `opened`, `reopened`, or `edited` event.
+- Any issue `opened`, `reopened`, or `edited` event unless the issue has the
+  `agent-benchmark` label.
 - A `labeled` event only when the label is `solve-it` (optional manual re-run).
 - A validated `agent-relay` repository dispatch.
 - A manual `workflow_dispatch` for an existing issue number.
 
-Every issue is recognized; `prepare-round.sh`'s trust gate, not a label, decides which issues actually run.
+Every non-benchmark issue is recognized; `prepare-round.sh`'s trust gate, not a
+label, decides which ordinary issues actually run. Benchmark issues are skipped
+on issue events and run only through explicit workflow dispatch.
 
 The reusable engine copies `.agent` to runner temporary storage before the model runs. All privileged preparation and finalization use this snapshot.
 

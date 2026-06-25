@@ -1,0 +1,10 @@
+providers:
+  - id: deepseek
+    workflow_provider: deepseek
+    model: deepseek-v4-pro[1m]
+    secret: DEEPSEEK_API_KEY
+
+  - id: mimo
+    workflow_provider: mimo
+    model: mimo-v2.5-pro
+    secret: MIMO_API_KEY

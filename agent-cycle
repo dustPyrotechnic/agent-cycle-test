@@ -16,12 +16,14 @@ Manage the Agent Cycle shortcut and deploy it from any target repository.
 Usage:
   agent-cycle setup [--bin-dir DIR] [--force]
   agent-cycle deploy [shortcut options] [install.sh options]
+  agent-cycle benchmark <command> [options]
   agent-cycle cancel-release [TAG] --yes [--engine-repository OWNER/REPO]
   agent-cycle help
 
 Commands:
   setup           Install this shortcut and its bundled deployer.
   deploy          Deploy Agent Cycle from the current target repository root.
+  benchmark       Create, run, collect, and report provider benchmark tasks.
   cancel-release  Delete a GitHub Release and its remote tag.
 
 Deploy shortcut options:
@@ -36,6 +38,54 @@ All other deploy options are forwarded to install.sh. Production deployments
 default to the private dustPyrotechnic/agent-cycle-test@v1 engine and commit the
 listener.
 EOF
+}
+
+benchmark() {
+  local script_dir=""
+  local benchmark_script=""
+  local download_dir=""
+  local _prior_trap=""
+  local gh_bin="${AGENT_CYCLE_GH_BIN:-gh}"
+
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "${script_dir}/.agent/scripts/benchmark.sh" ]]; then
+    benchmark_script="${script_dir}/.agent/scripts/benchmark.sh"
+  else
+    command -v "$gh_bin" >/dev/null 2>&1 || fail "gh is required to download the benchmark runner"
+    download_dir="$(mktemp -d)"
+    _prior_trap="$(trap -p EXIT)"
+    trap 'rm -rf "$download_dir"' EXIT
+    mkdir -p "${download_dir}/.agent/scripts" "${download_dir}/benchmarks"
+    for path in \
+      ".agent/scripts/benchmark.sh" \
+      "benchmarks/cases.yml" \
+      "benchmarks/providers.yml" \
+      "benchmarks/rubric.yml"; do
+      "$gh_bin" api \
+        --method GET \
+        -H "Accept: application/vnd.github.raw+json" \
+        "repos/${ENGINE_REPOSITORY}/contents/${path}" \
+        -f "ref=${ENGINE_REF}" >"${download_dir}/${path}"
+    done
+    benchmark_script="${download_dir}/.agent/scripts/benchmark.sh"
+  fi
+
+  if [[ -n "$download_dir" ]]; then
+    AGENT_BENCHMARK_CASES_FILE="${AGENT_BENCHMARK_CASES_FILE:-${download_dir}/benchmarks/cases.yml}" \
+      AGENT_BENCHMARK_PROVIDERS_FILE="${AGENT_BENCHMARK_PROVIDERS_FILE:-${download_dir}/benchmarks/providers.yml}" \
+      AGENT_BENCHMARK_RUBRIC_FILE="${AGENT_BENCHMARK_RUBRIC_FILE:-${download_dir}/benchmarks/rubric.yml}" \
+      GH_BIN="${GH_BIN:-$gh_bin}" \
+      bash "$benchmark_script" "$@"
+    rm -rf "$download_dir"
+    if [[ -n "$_prior_trap" ]]; then
+      eval "$_prior_trap"
+    else
+      trap - EXIT
+    fi
+  else
+    GH_BIN="${GH_BIN:-$gh_bin}" \
+      bash "$benchmark_script" "$@"
+  fi
 }
 
 setup_shortcut() {
@@ -278,6 +328,9 @@ case "$command_name" in
     ;;
   deploy)
     deploy "$@"
+    ;;
+  benchmark)
+    benchmark "$@"
     ;;
   cancel-release)
     cancel_release "$@"
