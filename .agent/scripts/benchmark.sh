@@ -36,8 +36,9 @@ require_command() {
 validate_max_rounds() {
   local value="$1"
 
-  [[ "$value" =~ ^[0-9]+$ ]] && ((value >= 1 && value <= 20)) ||
+  if [[ ! "$value" =~ ^[0-9]+$ ]] || ((value < 1 || value > 20)); then
     fail "max_rounds must be an integer between 1 and 20"
+  fi
 }
 
 parse_config_args() {

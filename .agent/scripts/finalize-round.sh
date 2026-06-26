@@ -18,6 +18,9 @@ AGENT_BASE_REF="${AGENT_BASE_REF:-}"
 AGENT_BASE_SHA="${AGENT_BASE_SHA:-}"
 gh_bin="${GH_BIN:-gh}"
 
+git config user.name "github-actions[bot]"
+git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
 if [[ -f "${ENGINE_ROOT}/credential-leak-detected" ]]; then
   "$gh_bin" issue comment "$ISSUE_NUMBER" --body "Agent 周期已停止：工作树中出现了配置的模型凭据。未提交或推送任何 agent 改动。请轮换受影响的凭据，并在重试前检查失败的运行。" >/dev/null
   "$gh_bin" issue edit "$ISSUE_NUMBER" --add-label agent-blocked >/dev/null

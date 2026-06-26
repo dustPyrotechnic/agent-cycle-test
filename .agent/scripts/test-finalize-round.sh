@@ -74,7 +74,9 @@ PATH="${bin_dir}:$PATH" \
   bash "${repo_root}/.agent/scripts/finalize-round.sh" >/dev/null
 
 grep -q -- "pr create --base benchmark-base --head agent/issue-1" "$gh_log"
+# shellcheck disable=SC2016
 grep -q 'client_payload\[base_ref\]=${pr_base_ref}' "${repo_root}/.agent/scripts/finalize-round.sh"
+# shellcheck disable=SC2016
 grep -q 'client_payload\[base_sha\]=${pr_base_sha}' "${repo_root}/.agent/scripts/finalize-round.sh"
 
 origin_moved="${test_root}/origin-moved.git"
